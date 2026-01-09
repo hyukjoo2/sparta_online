@@ -169,7 +169,7 @@ import { createDbFlow } from "/src/app/dbFlow.js";
 
     if (!__chatToggled) {
       __chatToggled = true;
-      _applyChatHeight(base * 2);
+      _applyChatHeight(base * 5);
     } else {
       __chatToggled = false;
       _applyChatHeight(null); // 원복
@@ -567,7 +567,7 @@ import { createDbFlow } from "/src/app/dbFlow.js";
   background.applyScreenState();
 
   setState((s) => ({ ...s, fileLinked: false }));
-  setFileStatus(el, "DB: (미연결)");
+  setFileStatus(el, "eDB: (미연결)");
 
   adenaTimerFeature.start();
 
