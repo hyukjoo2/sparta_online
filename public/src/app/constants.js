@@ -27,7 +27,7 @@ export const DEFAULT_BGMUSIC = [
   "./bgmusic/19_Desperate_Moment.mp3",
 ];
 
-export const CHATLOG_INTERVAL_MS = 3000;
+export const CHATLOG_INTERVAL_MS = 10000;
 export const BG_INTERVAL_MS = 20000;
 
 export const MAX_LEVEL = 50;
