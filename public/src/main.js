@@ -1,3 +1,4 @@
+// main.js
 // /src/main.js
 import { createHistoryModal } from "/src/features/history.js";
 import { createOcoCalcModal } from "/src/features/ocoCalc.js";
@@ -25,7 +26,17 @@ import {
 } from "/src/app/constants.js";
 
 import { getDomRefs } from "/src/app/dom.js";
-import { round2, fmt2, fmt2Plain, pad2, clamp, normalizeTS, todayTS, setFileStatus, appendLog } from "/src/app/utils.js";
+import {
+  round2,
+  fmt2,
+  fmt2Plain,
+  pad2,
+  clamp,
+  normalizeTS,
+  todayTS,
+  setFileStatus,
+  appendLog,
+} from "/src/app/utils.js";
 import { ensureBusyIndicator } from "/src/app/busyIndicator.js";
 import { detectApiOriginIfNeeded } from "/src/app/api.js";
 import { createChatRotation } from "/src/app/chatRotation.js";
@@ -68,6 +79,130 @@ import { createDbFlow } from "/src/app/dbFlow.js";
   function setState(updater) {
     state = typeof updater === "function" ? updater(state) : { ...state, ...updater };
   }
+
+  // ==========================================================
+  // ✅ Ctrl+T : 채팅창(로그 영역) 높이 "2배 ↔ 원복" 토글
+  // - base(원래 높이)는 최초 1회만 측정/확정
+  // - 토글 ON : height = base * 2 (px)
+  // - 토글 OFF: inline style을 원복해서 "진짜 원래 CSS"로 복귀
+  //
+  // ✔️ Ctrl+T가 안 먹는 대표 원인:
+  // - 브라우저 기본 새 탭 단축키가 먼저 먹음 → capture:true + preventDefault로 강제 차단
+  // - 높이를 %/auto로 쓰는 레이아웃 → base를 computed height(px)로 확정 후 px로 적용
+  // ==========================================================
+  let __chatHotkeyBound = false;
+  let __chatToggled = false;
+
+  let __chatBaseHeightPx = null; // 원래 높이(px)
+  let __chatStyleBackup = null; // 원래 inline style 백업
+
+  function _pickChatTargetEl() {
+    if (el?.consoleLog) return el.consoleLog;
+    const byId = document.getElementById("consoleLog");
+    if (byId) return byId;
+    return null;
+  }
+
+  function _backupInlineStyleOnce(target) {
+    if (__chatStyleBackup) return;
+    __chatStyleBackup = {
+      height: target.style.height || "",
+      maxHeight: target.style.maxHeight || "",
+      minHeight: target.style.minHeight || "",
+      overflow: target.style.overflow || "",
+      overflowY: target.style.overflowY || "",
+    };
+  }
+
+  function _measureBaseHeightPx(target) {
+    if (typeof __chatBaseHeightPx === "number" && __chatBaseHeightPx > 0) {
+      return __chatBaseHeightPx;
+    }
+
+    // 현재 렌더링된 실제 높이를 base로 확정
+    const cs = window.getComputedStyle(target);
+    const h = parseFloat(cs.height);
+
+    if (Number.isFinite(h) && h > 0) {
+      __chatBaseHeightPx = h;
+      return __chatBaseHeightPx;
+    }
+
+    const rectH = target.getBoundingClientRect?.().height;
+    __chatBaseHeightPx = Number.isFinite(rectH) && rectH > 0 ? rectH : 220;
+    return __chatBaseHeightPx;
+  }
+
+  function _applyChatHeight(pxOrNull) {
+    const target = _pickChatTargetEl();
+    if (!target) return;
+
+    _backupInlineStyleOnce(target);
+
+    if (pxOrNull == null) {
+      // 원복: inline을 원래대로 되돌려 "CSS 원래 규칙"이 다시 지배하게
+      target.style.height = __chatStyleBackup.height;
+      target.style.maxHeight = __chatStyleBackup.maxHeight;
+      target.style.minHeight = __chatStyleBackup.minHeight;
+      target.style.overflow = __chatStyleBackup.overflow;
+      target.style.overflowY = __chatStyleBackup.overflowY;
+    } else {
+      target.style.height = `${Math.round(pxOrNull)}px`;
+      // 기존에 max-height가 박혀있으면 2배 적용이 무효가 될 수 있어서 제거
+      target.style.maxHeight = "none";
+      // 혹시 overflow가 숨김이면 스크롤이 안 보여서 체감이 없을 수 있음
+      // 기존 스타일을 존중하고 싶으면 아래 2줄은 지워도 됨
+      if (!target.style.overflowY) target.style.overflowY = "auto";
+    }
+
+    // 레이아웃 변경 후 인디케이터 재배치
+    try {
+      syncQuotaTickerPosition();
+    } catch (_) {}
+  }
+
+  function toggleChatDoubleHeight() {
+    const target = _pickChatTargetEl();
+    if (!target) return;
+
+    const base = _measureBaseHeightPx(target);
+
+    if (!__chatToggled) {
+      __chatToggled = true;
+      _applyChatHeight(base * 2);
+    } else {
+      __chatToggled = false;
+      _applyChatHeight(null); // 원복
+    }
+
+    // 입력 포커스 유지
+    try {
+      if (el?.consoleInput && typeof el.consoleInput.focus === "function") {
+        el.consoleInput.focus();
+      }
+    } catch (_) {}
+  }
+
+  function bindChatHeightHotkeyOnce() {
+    if (__chatHotkeyBound) return;
+    __chatHotkeyBound = true;
+
+    window.addEventListener(
+      "keydown",
+      (e) => {
+        // Ctrl+T
+        if (!e.ctrlKey || e.key?.toLowerCase() !== "t") return;
+
+        // 브라우저 기본(새 탭) 방지
+        e.preventDefault();
+        e.stopPropagation();
+
+        toggleChatDoubleHeight();
+      },
+      { capture: true }
+    );
+  }
+  // ==========================================================
 
   // ===== chatlog rotation (System) =====
   let CHATLOG = [];
@@ -223,8 +358,6 @@ import { createDbFlow } from "/src/app/dbFlow.js";
     return true;
   }
   async function postChatLog(message) {
-    // api.js의 apiPostChatLog를 직접 import해도 되지만
-    // 여기서는 llmChat 모듈에 주입하는 용도로만 유지
     const { apiPostChatLog } = await import("/src/app/api.js");
     return apiPostChatLog(message);
   }
@@ -411,6 +544,9 @@ import { createDbFlow } from "/src/app/dbFlow.js";
 
   // 인디케이터 DOM 미리 준비
   ensureBusyIndicator();
+
+  // ✅ Ctrl+T 높이 2배 토글 바인딩
+  bindChatHeightHotkeyOnce();
 
   audio.initAudio();
   background.bindToggleButtonOnce();
