@@ -191,7 +191,12 @@ import { createDbFlow } from "/src/app/dbFlow.js";
       "keydown",
       (e) => {
         // Ctrl+T
-        if (!e.ctrlKey || e.key?.toLowerCase() !== "t") return;
+        if (
+          !e.ctrlKey ||
+          !(e.key?.toLowerCase() === "t" || e.key === "ㅅ")
+        ) {
+          return;
+        }
 
         // 브라우저 기본(새 탭) 방지
         e.preventDefault();
