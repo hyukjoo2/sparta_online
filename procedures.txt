@@ -1,0 +1,29 @@
+-- ollama-chatbot
+python3 -m venv .venv
+source .venv/bin/activate
+pip install fastapi uvicorn httpx
+uvicorn app:app --reload --port 8000
+
+-- Node
+server> npm run dev
+
+2) 폴더 구조로 쪼개기(추천 기본안)
+/index.html : 최소 뼈대(컨테이너, 모달, HUD 마크업만)
+x /assets/styles/base.css : reset, 공통 변수, 레이아웃
+x /assets/styles/hud.css : toolbar, badge, ticker, bottom UI
+x /assets/styles/orb.css : orb 전용
+x /assets/styles/modal.css : modal 전용
+x /src/main.js : 부트스트랩(이벤트 연결, 초기 로드)
+/src/state.js : 전역 상태(aden, entries, pendingValue, flags)
+/src/api.js : API origin 탐지 + fetch wrappers + endpoints
+x /src/ui/render.js : render(), dom 업데이트
+x /src/ui/modal.js : openModal/closeModal
+x /src/ui/menu.js : 메뉴 토글/닫기
+x /src/features/background.js : 배경 로테이션/페이드
+x /src/features/audio.js : bgm 플레이어/볼륨/뮤트
+x /src/features/adenaTimer.js : 치트 방지 아데나 타이머
+x /src/features/sessionTimer.js : 접속 시간 타이머
+x /src/features/commands.js : /명령어 파서
+x /src/features/history.js : History 모달
+x /src/features/ocoCalc.js : OCO 모달
+x /src/features/calculator.js

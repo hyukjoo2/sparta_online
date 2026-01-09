@@ -1,0 +1,65 @@
+/* ==========================================================================
+   modal.css
+   - modal + backdrop
+   ========================================================================== */
+
+.modal-backdrop{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.55);
+  backdrop-filter:blur(3px);
+  display:none;
+  z-index:10000050;
+}
+.modal-backdrop.show{ display:block; }
+
+.modal{
+  position:fixed;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-50%);
+  width:calc(100vw - 24px);
+  max-width:1400px;
+  background:var(--hud-bg);
+  border:1px solid var(--hud-border);
+  border-radius:22px;
+  box-shadow:var(--shadow);
+  backdrop-filter:blur(10px);
+  padding:16px;
+  z-index:10000060;
+}
+.modal.top{
+  top:12px;
+  transform:translateX(-50%);
+}
+
+.modal-header{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:6px 6px 12px;
+}
+.modal-header h2{ margin:0; font-size:18px; font-weight:950; }
+.modal-header .hint{
+  color:var(--muted);
+  font-size:12px;
+  font-weight:900;
+  white-space:nowrap;
+}
+.modal-header .x{
+  margin-left:auto;
+  width:38px;
+  height:38px;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,.22);
+  background:rgba(255,255,255,.12);
+  color:var(--text);
+  font-weight:950;
+  cursor:pointer;
+}
+.modal-body{
+  max-height:min(72vh, 720px);
+  overflow:auto;
+  -webkit-overflow-scrolling:touch;
+  padding:6px 6px 2px;
+}

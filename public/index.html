@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>SPARTA – ETHURIUM WORLD</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Press+Start+2P&display=swap" rel="stylesheet">
+
+<!-- ✅ CSS 분리 -->
+<link rel="stylesheet" href="/assets/styles/base.css" />
+<link rel="stylesheet" href="/assets/styles/hud.css" />
+<link rel="stylesheet" href="/assets/styles/orb.css" />
+<link rel="stylesheet" href="/assets/styles/modal.css" />
+
+<!-- ✅ (NEW) AI 팝업 전용 스타일 (기존 CSS 안 건드리고 추가만) -->
+<style>
+  .ai-backdrop{
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.55);
+    display: none;
+    align-items: center;
+    justify-content: center;
+
+    /* 🔥 최상위 레이어 */
+    z-index: 2147483647; /* max safe z-index */
+  }
+  .ai-backdrop[aria-hidden="false"]{ display:flex; }
+
+  .ai-modal{
+    width: min(920px, calc(100vw - 24px));
+    height: min(680px, calc(100vh - 24px));
+    background: rgba(10,12,18,.92);
+    border: 1px solid rgba(255,255,255,.18);
+    border-radius: 14px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.5);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    backdrop-filter: blur(8px);
+  }
+
+  .ai-header{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(255,255,255,.12);
+  }
+  .ai-title{
+    font-family: Cinzel, serif;
+    font-weight: 800;
+    letter-spacing: .6px;
+    color: rgba(255,255,255,.92);
+    font-size: 16px;
+    margin: 0;
+  }
+  .ai-sub{
+    margin-left:auto;
+    color: rgba(255,255,255,.55);
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .ai-close{
+    margin-left: 10px;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,.18);
+    background: rgba(255,255,255,.06);
+    color: rgba(255,255,255,.92);
+    cursor: pointer;
+    font-weight: 900;
+  }
+
+  .ai-body{
+    flex: 1;
+    padding: 14px;
+    overflow: auto;
+  }
+
+  .ai-msg{
+    max-width: 86%;
+    padding: 10px 12px;
+    border-radius: 12px;
+    margin: 10px 0;
+    line-height: 1.35;
+    font-size: 14px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    border: 1px solid rgba(0,0,0,.08);
+  }
+
+  /* ✅ 사용자: 흰 배경 + 검정 글씨 + 박스 */
+  .ai-msg.user{
+    margin-left: auto;
+    background: #ffffff;
+    color: #111111;
+  }
+
+  /* ✅ AI: 옅은 회색 + 검정 글씨 + 박스 */
+  .ai-msg.ai{
+    margin-right: auto;
+    background: #e9e9e9;
+    color: #111111;
+  }
+
+  .ai-footer{
+    padding: 12px 14px;
+    border-top: 1px solid rgba(255,255,255,.12);
+    display:flex;
+    gap:10px;
+    align-items:center;
+  }
+
+  .ai-input{
+    flex: 1;
+    height: 42px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,.18);
+    background: rgba(255,255,255,.08);
+    color: rgba(255,255,255,.92);
+    padding: 0 12px;
+    outline: none;
+    font-size: 14px;
+  }
+  .ai-input::placeholder{ color: rgba(255,255,255,.5); }
+
+  .ai-send{
+    height: 42px;
+    padding: 0 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,.18);
+    background: rgba(255,255,255,.12);
+    color: rgba(255,255,255,.92);
+    cursor: pointer;
+    font-weight: 800;
+  }
+  .ai-send:disabled{
+    opacity: .55;
+    cursor: not-allowed;
+  }
+</style>
+</head>
+
+<body>
+<div class="bg-layer" id="bgA"></div>
+<div class="bg-layer" id="bgB"></div>
+<div class="overlay"></div>
+
+<div class="pnl-badge" id="pnlBadge">
+  <span class="coin" aria-hidden="true">💰</span>
+  <span class="val" id="pnlText">-</span>
+  <span class="timer" id="adenaTimer">60:00</span>
+</div>
+
+<div class="center-logo">
+  <img src="/images/spartalogo.png" alt="SPARTA Logo">
+  <div class="episode-title">
+    <div class="ep">Episode 1</div>
+    <div class="name">말하는 섬</div>
+  </div>
+</div>
+
+<div class="game-title">WELCOME TO ETHURIUM WORLD (USDT)</div>
+
+<div class="audio-ui" aria-label="BGM controls">
+  <button class="icon-btn" id="bgToggleBtn" type="button" title="Screen Toggle (OFF)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <rect x="3" y="4" width="18" height="12" rx="2"></rect>
+      <path d="M8 20h8"></path>
+      <path d="M12 16v4"></path>
+    </svg>
+  </button>
+
+  <button class="icon-btn" id="playBtn" type="button" title="Play">
+    <svg id="playIcon" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M8 5v14l11-7z"></path>
+    </svg>
+    <svg id="pauseIcon" viewBox="0 0 24 24" fill="currentColor" style="display:none">
+      <path d="M6 5h4v14H6zM14 5h4v14h-4z"></path>
+    </svg>
+  </button>
+
+  <button class="icon-btn" id="muteBtn" type="button" title="Unmuted">
+    <svg id="volOnIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M11 5L6 9H3v6h3l5 4V5z"></path>
+      <path d="M15.5 8.5a4 4 0 010 7"></path>
+      <path d="M18.5 5.5a8 8 0 010 13"></path>
+    </svg>
+    <svg id="volOffIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none">
+      <path d="M11 5L6 9H3v6h3l5 4V5z"></path>
+      <path d="M16 8l6 8"></path>
+      <path d="M22 8l-6 8"></path>
+    </svg>
+  </button>
+
+  <div class="sep"></div>
+
+  <div class="vol">
+    <span style="font-weight:900;color:var(--muted);font-size:12px;">VOL</span>
+    <input id="volSlider" type="range" min="0" max="100" value="25">
+  </div>
+</div>
+
+<audio id="bgm" preload="auto"></audio>
+
+<form class="toolbar" id="topForm" autocomplete="off">
+  <span class="title">SPARTA HUD</span>
+
+  <input id="priceInput" type="number" step="0.000000001"
+         placeholder="가격 입력 (Enter로 UI 반영)"
+         autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="decimal">
+
+  <div class="menubar" role="menubar" aria-label="Toolbar Menus">
+    <div class="menu" data-menu="file">
+      <button class="menu-btn" type="button" id="fileMenuBtn">File ▾</button>
+      <div class="menu-panel" role="menu">
+        <button class="menu-item" type="button" id="openBtn">DB Reload (ALL tables)</button>
+        <button class="menu-item" type="button" id="saveOpenedBtn">오늘 값 DB 저장 (history upsert)</button>
+        <div class="menu-sep"></div>
+        <button class="menu-item" type="button" id="mobileSaveBtn">DB 저장(동일)</button>
+        <button class="menu-item" type="button" id="downloadBtn">DB 저장(동일)</button>
+      </div>
+    </div>
+
+    <div class="menu" data-menu="view">
+      <button class="menu-btn" type="button">View ▾</button>
+      <div class="menu-panel" role="menu">
+        <button class="menu-item" type="button" id="historyBtn">History</button>
+        <button class="menu-item" type="button" id="reloadBtn">Reload (DB ALL)</button>
+      </div>
+    </div>
+
+    <div class="menu" data-menu="tools">
+      <button class="menu-btn" type="button">Tool ▾</button>
+      <div class="menu-panel" role="menu">
+        <button class="menu-item" type="button" id="ocoBtn">OCO Quick Calc</button>
+        <button class="menu-item" type="button" id="calcBtn">계산기</button>
+      </div>
+    </div>
+
+    <!-- ✅ Ai 버튼 -->
+    <div class="menu" data-menu="ai">
+      <button class="menu-btn" type="button" id="aiBtn">Ai</button>
+    </div>
+  </div>
+
+  <div class="toolbar-center">
+    <div class="countdown-hud" aria-label="Countdown HUD">
+      <div class="label" id="countdownLabel">COUNTDOWN TO 2026-06-30</div>
+      <div class="time" id="countdownText">-</div>
+    </div>
+  </div>
+
+  <span class="badge" id="priceBadge">Current: -</span>
+  <span class="badge" id="fileStatus">DB: (미연결)</span>
+</form>
+
+<div class="quota-ticker" id="quotaTicker" aria-hidden="true">
+  <div class="track" id="quotaTrack">
+    <span class="msg">[Sparta군주] 님, 오늘의 목포를 달성 하였습니다. 이제 차트를 닫고 휴식을 권고합니다!</span>
+    <span class="gap"></span>
+    <span class="msg">[Sparta군주] 님, 오늘의 목표를 달성 하였습니다. 이제 차트를 닫고 휴식을 권고합니다!</span>
+    <span class="gap"></span>
+  </div>
+</div>
+
+<div class="orb orb-left hidden" id="leftOrb" aria-label="Left Crystal Orb">
+  <div class="fill fill-green" id="leftFill">
+    <svg class="water-fx" viewBox="0 0 300 120" preserveAspectRatio="none" aria-hidden="true">
+      <defs>
+        <linearGradient id="shineGradL" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="rgba(255,255,255,0.00)"/>
+          <stop offset="0.45" stop-color="rgba(255,255,255,0.28)"/>
+          <stop offset="0.55" stop-color="rgba(255,255,255,0.14)"/>
+          <stop offset="1" stop-color="rgba(255,255,255,0.00)"/>
+        </linearGradient>
+      </defs>
+      <path class="water-line" d="" />
+      <path class="water-shine" d="" fill="url(#shineGradL)" />
+    </svg>
+  </div>
+  <div class="glass"></div>
+  <div class="ring"></div>
+  <div class="label" id="leftLabel">-</div>
+</div>
+
+<div class="orb orb-right hidden" id="rightOrb" aria-label="Right Crystal Orb">
+  <div class="fill fill-blue" id="rightFill">
+    <svg class="water-fx" viewBox="0 0 300 120" preserveAspectRatio="none" aria-hidden="true">
+      <defs>
+        <linearGradient id="shineGradR" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="rgba(255,255,255,0.00)"/>
+          <stop offset="0.45" stop-color="rgba(255,255,255,0.28)"/>
+          <stop offset="0.55" stop-color="rgba(255,255,255,0.14)"/>
+          <stop offset="1" stop-color="rgba(255,255,255,0.00)"/>
+        </linearGradient>
+      </defs>
+      <path class="water-line" d="" />
+      <path class="water-shine" d="" fill="url(#shineGradR)" />
+    </svg>
+  </div>
+  <div class="glass"></div>
+  <div class="ring"></div>
+  <div class="label" id="rightLabel">-</div>
+</div>
+
+<!-- 기존 모달 -->
+<div class="modal-backdrop" id="modalBackdrop" aria-hidden="true">
+  <div class="modal" id="modalRoot" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-header">
+      <h2 id="modalTitle">-</h2>
+      <span class="hint" id="modalHint"></span>
+      <button class="x" type="button" id="modalClose">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<!-- ✅ (NEW) AI 팝업 -->
+<div class="ai-backdrop" id="aiBackdrop" aria-hidden="true">
+  <div class="ai-modal" role="dialog" aria-modal="true" aria-labelledby="aiTitle">
+    <div class="ai-header">
+      <h2 class="ai-title" id="aiTitle">AI CHAT</h2>
+      <div class="ai-sub" id="aiStatus">ready</div>
+      <button class="ai-close" type="button" id="aiCloseBtn">✕</button>
+    </div>
+
+    <div class="ai-body" id="aiChatBody" aria-label="AI conversation"></div>
+
+    <div class="ai-footer">
+      <input class="ai-input" id="aiInput" type="text" placeholder="메시지 입력..." autocomplete="off" />
+      <button class="ai-send" id="aiSendBtn" type="button">Send</button>
+    </div>
+  </div>
+</div>
+
+<div class="bottom-console" aria-label="Command console">
+  <textarea id="consoleLog" class="console-log" readonly
+    placeholder="명령어 결과가 여기에 누적됩니다."></textarea>
+  <input id="consoleCmd" class="console-cmd" type="text"
+    placeholder="명령어 입력 (예: /누구, /시간, /경험치, /채팅 끔, /채팅 켬, /오브 끔, /오브 켬, /화면 끔, /화면 켬, /음악 끔, /음악 켬, /그래프, /계산기, /oco, /리로드)">
+</div>
+
+<div class="bottom-indicator" aria-label="Current indicator">
+  <div class="wrap">
+    <div class="bar"><div class="fill" id="bottomFill"></div></div>
+    <div class="value" id="bottomValue">- / 50000</div>
+  </div>
+</div>
+
+<!-- ✅ JS 분리 -->
+<script type="module" src="/src/main.js"></script>
+
+<!-- ✅ (NEW) AI 팝업 로직 -->
+<script>
+  window.addEventListener("DOMContentLoaded", () => {
+    const aiBtn = document.getElementById("aiBtn");
+    const aiBackdrop = document.getElementById("aiBackdrop");
+    const aiCloseBtn = document.getElementById("aiCloseBtn");
+    const aiChatBody = document.getElementById("aiChatBody");
+    const aiInput = document.getElementById("aiInput");
+    const aiSendBtn = document.getElementById("aiSendBtn");
+    const aiStatus = document.getElementById("aiStatus");
+
+    // ✅ Ollama/FastAPI(또는 네가 만든 LLM 서버) 엔드포인트
+    // main.js에서도 쓰던 그 값으로 맞춤
+    const LLM_ENDPOINT = "http://127.0.0.1:8000/chat";
+    const LLM_MAX_TURNS = 20;
+
+    // AI 대화 히스토리(팝업 전용)
+    const aiMessages = [
+      { role: "system", content: "You are a helpful assistant. Answer in Korean, concise." },
+    ];
+
+    function trimHistory() {
+      const keep = 1 + LLM_MAX_TURNS * 2;
+      if (aiMessages.length > keep) aiMessages.splice(1, aiMessages.length - keep);
+    }
+
+    function openAiPopup() {
+      aiBackdrop.setAttribute("aria-hidden", "false");
+      // 첫 오픈 시 포커스
+      setTimeout(() => { try { aiInput.focus(); } catch {} }, 0);
+    }
+
+    function closeAiPopup() {
+      aiBackdrop.setAttribute("aria-hidden", "true");
+    }
+
+    function addBubble(kind, text) {
+      const div = document.createElement("div");
+      div.className = "ai-msg " + (kind === "user" ? "user" : "ai");
+      div.textContent = String(text ?? "");
+      aiChatBody.appendChild(div);
+      aiChatBody.scrollTop = aiChatBody.scrollHeight;
+    }
+
+    async function sendToAi(userText) {
+      const msg = String(userText || "").trim();
+      if (!msg) return;
+
+      // 내 말
+      addBubble("user", msg);
+
+      aiMessages.push({ role: "user", content: msg });
+      trimHistory();
+
+      aiStatus.textContent = "thinking...";
+      aiSendBtn.disabled = true;
+      aiInput.disabled = true;
+
+      try {
+        const res = await fetch(LLM_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messages: aiMessages }),
+        });
+
+        if (!res.ok) throw new Error("HTTP " + res.status);
+
+        const data = await res.json();
+        const content = String(data?.content ?? "").trim();
+        if (!content) throw new Error("빈 응답");
+
+        aiMessages.push({ role: "assistant", content });
+        trimHistory();
+
+        // AI 답
+        addBubble("ai", content);
+        aiStatus.textContent = "ready";
+      } catch (e) {
+        addBubble("ai", "연결 오류: AI 서버를 확인하세요. (" + (e?.message ?? e) + ")");
+        aiStatus.textContent = "error";
+      } finally {
+        aiSendBtn.disabled = false;
+        aiInput.disabled = false;
+        try { aiInput.focus(); } catch {}
+      }
+    }
+
+    // 버튼 바인딩
+    aiBtn?.addEventListener("click", openAiPopup);
+    aiCloseBtn?.addEventListener("click", closeAiPopup);
+
+    // 바깥 클릭하면 닫기(모달 밖 클릭)
+    aiBackdrop?.addEventListener("click", (e) => {
+      if (e.target === aiBackdrop) closeAiPopup();
+    });
+
+    // ESC로 닫기
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && aiBackdrop.getAttribute("aria-hidden") === "false") {
+        closeAiPopup();
+      }
+    });
+
+    // 전송
+    aiSendBtn?.addEventListener("click", () => {
+      const text = aiInput.value;
+      aiInput.value = "";
+      sendToAi(text);
+    });
+
+    aiInput?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        const text = aiInput.value;
+        aiInput.value = "";
+        sendToAi(text);
+      }
+    });
+
+    // 첫 안내(원하면 삭제)
+    addBubble("ai", "AI 채팅 준비 완료. 메시지를 입력해 주세요.");
+  });
+</script>
+
+</body>
+</html>

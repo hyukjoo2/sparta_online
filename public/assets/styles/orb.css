@@ -1,0 +1,111 @@
+/* ==========================================================================
+   orb.css
+   - orb only
+   ========================================================================== */
+
+.orb{
+  position:fixed;
+  width:315px;
+  height:315px;
+  border-radius:50%;
+  z-index:20;
+  box-shadow: 0 18px 40px rgba(0,0,0,.55);
+  border:1px solid rgba(255,255,255,.22);
+  backdrop-filter: blur(6px);
+  overflow:hidden;
+}
+.orb-left{ left:24px; top:50%; transform:translateY(-50%); }
+.orb-right{ right:24px; top:50%; transform:translateY(-50%); }
+.orb.hidden{ display:none; }
+
+.orb .glass{
+  position:absolute;
+  inset:0;
+  border-radius:50%;
+  background:
+    radial-gradient(circle at 30% 25%, rgba(255,255,255,.35), rgba(255,255,255,0) 45%),
+    radial-gradient(circle at 70% 75%, rgba(255,255,255,.10), rgba(255,255,255,0) 55%),
+    rgba(10,12,18,.35);
+}
+.orb .fill{
+  position:absolute;
+  left:0;
+  right:0;
+  bottom:0;
+  height:0%;
+  transition: height .35s ease;
+  overflow:hidden;
+}
+.orb .ring{
+  position:absolute;
+  inset:14px;
+  border-radius:50%;
+  border:1px solid rgba(255,255,255,.18);
+  box-shadow: inset 0 0 22px rgba(255,255,255,.08);
+}
+.orb .label{
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  padding:16px;
+  font-weight:950;
+  color:rgba(255,255,255,.92);
+  text-shadow: 0 6px 18px rgba(0,0,0,.85);
+  line-height:1.15;
+}
+
+.orb-metric{
+  width:100%;
+  max-width:260px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:8px;
+}
+.orb-metric .title{
+  font-size:14px;
+  font-weight:950;
+  color:rgba(255,255,255,.86);
+  letter-spacing:1px;
+}
+.orb-metric .num{ font-size:28px; font-weight:950; }
+.orb-metric .pct{ font-size:14px; font-weight:950; color:rgba(255,255,255,.78); }
+.orb-metric .arrow{ font-size:16px; font-weight:950; margin-top:-2px; color:rgba(255,255,255,.85); }
+
+.fill-blue{ background: linear-gradient(to top, rgba(40,140,255,.92), rgba(40,140,255,.25)); }
+.fill-green{ background: linear-gradient(to top, rgba(60,255,122,.92), rgba(60,255,122,.22)); }
+.fill-red{ background: linear-gradient(to top, rgba(255,77,79,.92), rgba(255,77,79,.22)); }
+.fill-neutral{ background: linear-gradient(to top, rgba(255,255,255,.60), rgba(255,255,255,.10)); }
+
+/* water fx vars */
+.fill-blue{ --waterLine: rgba(255,255,255,.55); --waterShine: rgba(255,255,255,.22); }
+.fill-green{ --waterLine: rgba(255,255,255,.55); --waterShine: rgba(255,255,255,.22); }
+.fill-red{ --waterLine: rgba(255,255,255,.55); --waterShine: rgba(255,255,255,.22); }
+.fill-neutral{ --waterLine: rgba(255,255,255,.45); --waterShine: rgba(255,255,255,.18); }
+
+.water-fx{
+  position:absolute;
+  left:-25%;
+  width:150%;
+  height:120px;
+  top:-70px;
+  pointer-events:none;
+  opacity:.95;
+  filter: drop-shadow(0 10px 14px rgba(0,0,0,.25));
+}
+.water-line{
+  fill:none;
+  stroke: var(--waterLine);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity:.85;
+}
+.water-shine{
+  opacity:.65;
+  filter: blur(0.6px);
+  mix-blend-mode: screen;
+}
