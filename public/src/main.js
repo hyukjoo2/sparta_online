@@ -191,6 +191,96 @@ import { createMenuUI } from "/src/ui/menu.js";
   }
 
   // =====================================================================
+  // ✅ (NEW) 전역 로딩 인디케이터 (AI 응답 대기용)
+  // =====================================================================
+  let busyIndicatorEl = null;
+  let busyIndicatorStyleEl = null;
+  let busyCount = 0; // 동시에 여러 작업이 떠도 안전하게
+
+  function ensureBusyIndicator() {
+    if (!busyIndicatorStyleEl) {
+      const st = document.createElement("style");
+      st.id = "spartaBusyIndicatorStyle";
+      st.textContent = `
+        @keyframes spartaSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        #spartaBusyIndicator {
+          position: fixed;
+          inset: 0;
+          z-index: 4000000;
+          display: none;
+          align-items: center;
+          justify-content: center;
+          background: rgba(0,0,0,.45);
+          backdrop-filter: blur(2px);
+          -webkit-backdrop-filter: blur(2px);
+          pointer-events: auto;
+        }
+        #spartaBusyIndicator .box{
+          display:flex;
+          align-items:center;
+          gap:12px;
+          padding:14px 16px;
+          border-radius:14px;
+          border: 1px solid rgba(255,255,255,.18);
+          background: rgba(10,12,18,.72);
+          box-shadow: 0 10px 30px rgba(0,0,0,.45);
+          color: rgba(255,255,255,.92);
+          font-size: 14px;
+          max-width: min(520px, calc(100vw - 40px));
+        }
+        #spartaBusyIndicator .spinner{
+          width:18px;
+          height:18px;
+          border-radius:999px;
+          border: 2px solid rgba(255,255,255,.25);
+          border-top-color: rgba(255,255,255,.95);
+          animation: spartaSpin .9s linear infinite;
+          flex: 0 0 auto;
+        }
+        #spartaBusyIndicator .msg{
+          line-height: 1.3;
+          word-break: break-word;
+          white-space: pre-wrap;
+        }
+      `;
+      document.head.appendChild(st);
+      busyIndicatorStyleEl = st;
+    }
+
+    if (!busyIndicatorEl) {
+      const ov = document.createElement("div");
+      ov.id = "spartaBusyIndicator";
+      ov.innerHTML = `
+        <div class="box" role="status" aria-live="polite" aria-busy="true">
+          <div class="spinner" aria-hidden="true"></div>
+          <div class="msg" id="spartaBusyIndicatorMsg">처리 중...</div>
+        </div>
+      `;
+      document.body.appendChild(ov);
+      busyIndicatorEl = ov;
+    }
+
+    return busyIndicatorEl;
+  }
+
+  function showBusyIndicator(message = "AI 응답 생성 중...") {
+    ensureBusyIndicator();
+    busyCount = Math.max(0, busyCount) + 1;
+
+    const msgEl = document.getElementById("spartaBusyIndicatorMsg");
+    if (msgEl) msgEl.textContent = String(message || "처리 중...");
+
+    busyIndicatorEl.style.display = "flex";
+  }
+
+  function hideBusyIndicator() {
+    busyCount = Math.max(0, busyCount - 1);
+    if (busyCount > 0) return;
+
+    if (busyIndicatorEl) busyIndicatorEl.style.display = "none";
+  }
+
+  // =====================================================================
   // ✅ 날짜 포맷/비교 표준화: YYYY-MM-DD
   // =====================================================================
   function toYYYYMMDDFromDate(d) {
@@ -544,6 +634,9 @@ import { createMenuUI } from "/src/ui/menu.js";
 
     const SYSTEM_PROMPT = "You are a player of a MMORPG. Give your answer shortly in Korean.";
 
+    // ✅ (NEW) 화면 인디케이터 ON
+    showBusyIndicator("AI 응답 생성 중...");
+
     try {
       const res = await fetch(LLM_ENDPOINT, {
         method: "POST",
@@ -566,6 +659,9 @@ import { createMenuUI } from "/src/ui/menu.js";
     } catch (e) {
       appendLog(`[BOT] 에러: 서버 또는 Ollama 연결을 확인하세요. (${e?.message ?? e})`);
     } finally {
+      // ✅ (NEW) 화면 인디케이터 OFF
+      hideBusyIndicator();
+
       el.consoleCmd.disabled = prevDisabled;
       el.consoleCmd.placeholder = prevPlaceholder || "";
       try {
@@ -794,6 +890,9 @@ import { createMenuUI } from "/src/ui/menu.js";
       sendBtn.style.opacity = "0.6";
       sendBtn.textContent = "분석 중...";
 
+      // ✅ (NEW) 화면 인디케이터 ON
+      showBusyIndicator("AI 분석 중...");
+
       try {
         let rows = [];
         try {
@@ -845,6 +944,9 @@ import { createMenuUI } from "/src/ui/menu.js";
         });
         drawTurns();
       } finally {
+        // ✅ (NEW) 화면 인디케이터 OFF
+        hideBusyIndicator();
+
         aiDialog.busy = false;
         sendBtn.disabled = false;
         sendBtn.style.opacity = "1";
@@ -1319,11 +1421,6 @@ import { createMenuUI } from "/src/ui/menu.js";
 
   // =====================================================================
   // ✅ Matrix Tool (GAME-LIKE)
-  // - History / Exit 를 "버튼 클릭"이 아니라 "캐릭터 충돌"로 트리거
-  // - overlay에는 버튼을 만들지 않음
-  // - gameWorld.js 에서 아래 이벤트를 dispatch 해주면 동작:
-  //   window.dispatchEvent(new CustomEvent("matrix:trigger", { detail: { action: "history" } }));
-  //   window.dispatchEvent(new CustomEvent("matrix:trigger", { detail: { action: "exit" } }));
   // =====================================================================
   let matrixWorld = null;
   let matrixPrevScreenEnabled = null;
@@ -1361,7 +1458,7 @@ import { createMenuUI } from "/src/ui/menu.js";
     if (bodyOverflowBackup.value === null) bodyOverflowBackup.value = document.body.style.overflow || "";
     document.body.style.overflow = "hidden";
 
-    const excludeIds = new Set(["matrixOverlay", "modalBackdrop", "modalRoot"]);
+    const excludeIds = new Set(["matrixOverlay", "modalBackdrop", "modalRoot", "spartaBusyIndicator"]);
 
     const kids = Array.from(document.body.children || []);
     for (const n of kids) {
@@ -1417,7 +1514,6 @@ import { createMenuUI } from "/src/ui/menu.js";
     ov.style.background = "rgba(0,0,0,.72)";
     ov.style.display = "block";
 
-    // ✅ 버튼 바 없음 (History/X는 "충돌"로 처리)
     document.body.appendChild(ov);
     matrixOverlay = ov;
   }
@@ -1437,13 +1533,11 @@ import { createMenuUI } from "/src/ui/menu.js";
 
     const action = e?.detail?.action;
     if (action === "history") {
-      // 충돌로 history open
       closeAllMenus2();
       openHistory();
       return;
     }
     if (action === "exit") {
-      // 충돌로 matrix exit
       teardownMatrixWorld();
       return;
     }
@@ -1496,13 +1590,8 @@ import { createMenuUI } from "/src/ui/menu.js";
     if (matrixWorldOpen) return;
     matrixWorldOpen = true;
 
-    // ✅ main UI 숨김
     hideMainUIExceptMatrix();
-
-    // ✅ 충돌 이벤트 리스너는 1회만 바인딩
     bindMatrixTriggerEventsOnce();
-
-    // ✅ (NEW) 은행 입금 이벤트 리스너 1회만 바인딩
     bindBankDepositEventOnce();
 
     matrixPrevScreenEnabled = screenEnabled;
@@ -1519,8 +1608,6 @@ import { createMenuUI } from "/src/ui/menu.js";
       closeAllMenus2,
       getScreenEnabled: () => screenEnabled,
       getEntries: () => entries,
-
-      // (옵션) gameWorld가 콜백으로도 호출하고 싶으면 유지
       onOpenAiPopup: () => openAiChatPopup(),
     });
 
@@ -1600,6 +1687,9 @@ import { createMenuUI } from "/src/ui/menu.js";
 
   // ✅ (NEW) Matrix 안 들어가도 은행 이벤트가 들어올 수 있으니, 여기서도 1회 바인딩
   bindBankDepositEventOnce();
+
+  // ✅ (NEW) 인디케이터 DOM 미리 준비(선택 사항이지만 체감 좋아짐)
+  ensureBusyIndicator();
 
   audio.initAudio();
   background.bindToggleButtonOnce();
