@@ -2,10 +2,7 @@
 // 계산기 모달 (기존 index.html의 openCalculator()를 모듈화)
 
 export function createCalculatorModal(ctx) {
-  const {
-    openModal,
-    getPrevAndCurrForDisplay,
-  } = ctx;
+  const { openModal, getPrevAndCurrForDisplay } = ctx;
 
   function openCalculator() {
     const root = document.createElement("div");
@@ -51,6 +48,25 @@ export function createCalculatorModal(ctx) {
         </div>
         <div class="output" id="c2_out" style="margin-top:10px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);font-weight:950;">변화율: -</div>
       </div>
+
+      <div style="height:12px"></div>
+
+      <div style="padding:12px;background:rgba(0,0,0,.2);border:1px solid rgba(255,255,255,.12);border-radius:14px;">
+        <div style="font-weight:900;color:rgba(255,255,255,.82);margin-bottom:10px;">3) 현재값의 퍼센트(%) → 예상 금액</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+            <label style="font-size:12px;font-weight:900;color:rgba(255,255,255,.72)">현재값</label>
+            <input id="c3_value" type="number" step="0.000000001" placeholder="예: 100"
+              style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:rgba(255,255,255,.92);outline:none;">
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+            <label style="font-size:12px;font-weight:900;color:rgba(255,255,255,.72)">퍼센트(%)</label>
+            <input id="c3_pct" type="number" step="0.000000001" placeholder="예: 50"
+              style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:rgba(255,255,255,.92);outline:none;">
+          </div>
+        </div>
+        <div class="output" id="c3_out" style="margin-top:10px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);font-weight:950;">예상 금액: -</div>
+      </div>
     `;
 
     openModal("계산기", "입력값은 유지됩니다(파일 reload와 무관)", root);
@@ -62,10 +78,17 @@ export function createCalculatorModal(ctx) {
     const c2_b = root.querySelector("#c2_b");
     const c2_out = root.querySelector("#c2_out");
 
+    const c3_value = root.querySelector("#c3_value");
+    const c3_pct = root.querySelector("#c3_pct");
+    const c3_out = root.querySelector("#c3_out");
+
     c1_value.value = sessionStorage.getItem("calc_c1_value") || "";
     c1_pct.value = sessionStorage.getItem("calc_c1_pct") || "";
     c2_a.value = sessionStorage.getItem("calc_c2_a") || "";
     c2_b.value = sessionStorage.getItem("calc_c2_b") || "";
+
+    c3_value.value = sessionStorage.getItem("calc_c3_value") || "";
+    c3_pct.value = sessionStorage.getItem("calc_c3_pct") || "";
 
     function setSignedClass(node, v) {
       node.classList.remove("positive", "negative");
@@ -96,26 +119,68 @@ export function createCalculatorModal(ctx) {
       setSignedClass(c2_out, pct);
     }
 
+    // ✅ 3) 현재값의 퍼센트(%) → 예상 금액 (v * p / 100)
+    function calc3() {
+      const v = Number(c3_value.value);
+      const p = Number(c3_pct.value);
+      if (!Number.isFinite(v) || !Number.isFinite(p)) {
+        c3_out.textContent = "예상 금액: -";
+        return;
+      }
+      c3_out.textContent = `예상 금액: ${(v * (p / 100)).toFixed(9)}`;
+    }
+
     function persist() {
       sessionStorage.setItem("calc_c1_value", c1_value.value);
       sessionStorage.setItem("calc_c1_pct", c1_pct.value);
       sessionStorage.setItem("calc_c2_a", c2_a.value);
       sessionStorage.setItem("calc_c2_b", c2_b.value);
+
+      sessionStorage.setItem("calc_c3_value", c3_value.value);
+      sessionStorage.setItem("calc_c3_pct", c3_pct.value);
     }
 
     ["input", "change"].forEach((evt) => {
-      c1_value.addEventListener(evt, () => { calc1(); persist(); });
-      c1_pct.addEventListener(evt, () => { calc1(); persist(); });
-      c2_a.addEventListener(evt, () => { calc2(); persist(); });
-      c2_b.addEventListener(evt, () => { calc2(); persist(); });
+      c1_value.addEventListener(evt, () => {
+        calc1();
+        persist();
+      });
+      c1_pct.addEventListener(evt, () => {
+        calc1();
+        persist();
+      });
+      c2_a.addEventListener(evt, () => {
+        calc2();
+        persist();
+      });
+      c2_b.addEventListener(evt, () => {
+        calc2();
+        persist();
+      });
+
+      c3_value.addEventListener(evt, () => {
+        calc3();
+        persist();
+      });
+      c3_pct.addEventListener(evt, () => {
+        calc3();
+        persist();
+      });
     });
 
     const { curr, prev } = getPrevAndCurrForDisplay();
+
+    // 기존 자동 채움 유지
     if (!c1_value.value && curr !== null) c1_value.value = String(curr);
     if (!c2_a.value && prev !== null) c2_a.value = String(prev);
     if (!c2_b.value && curr !== null) c2_b.value = String(curr);
 
-    calc1(); calc2();
+    // ✅ 3번도 현재값 자동 채움 (비어있으면)
+    if (!c3_value.value && curr !== null) c3_value.value = String(curr);
+
+    calc1();
+    calc2();
+    calc3();
   }
 
   return { openCalculator };
