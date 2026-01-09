@@ -1,3 +1,4 @@
+// app.js
 // server/src/app.js
 import express from "express";
 import cors from "cors";
@@ -37,7 +38,6 @@ async function tableExists(tableName) {
   `;
   const dbName = process.env.DB_NAME || process.env.MYSQL_DATABASE || process.env.DATABASE || "";
   if (!dbName) {
-    // DB_NAME이 비어있으면 information_schema 체크가 실패할 수 있으니 안전하게 false
     console.warn("[DB] DB_NAME is empty. Please set DB_NAME in .env");
     return false;
   }
@@ -97,12 +97,22 @@ async function readPathListFromDB(tableName) {
   }
 }
 
+// ======================================================================
+// ✅ KST(Asia/Seoul) 기준 YYYY-MM-DD
+// - 서버 timezone / mysql2 date 파싱과 무관하게 “오늘”을 KST로 고정
+// ======================================================================
+function todayKstYYYYMMDD(date = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+// 기존 todayTS()를 KST 버전으로 교체
 function todayTS() {
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
+  return todayKstYYYYMMDD();
 }
 
 async function readAdenaFromDB() {
@@ -233,10 +243,26 @@ async function applyAdenaDelta(delta) {
   throw new Error("Adena write target not found. Set ADENA_TABLE & ADENA_COLUMN in .env.");
 }
 
+// ======================================================================
+// ✅ HISTORY: TS를 “항상 YYYY-MM-DD 문자열”로 내려주기
+// - 이렇게 하면 프론트 차트가 UTC ISO 때문에 하루 밀리는 문제가 사라짐
+// - TS가 DATE면 그냥 문자열화됨
+// - TS가 DATETIME/TIMESTAMP여도 날짜만 잘라서 문자열로 내려감
+// ======================================================================
+const SELECT_HISTORY_SQL = `
+  SELECT
+    id,
+    DATE_FORMAT(TS, '%Y-%m-%d') AS TS,
+    AMOUNT,
+    PNL
+  FROM history
+  ORDER BY TS ASC
+`;
+
 async function readHistoryFromDB() {
   try {
     if (!(await tableExists("history"))) return [];
-    const [rows] = await pool.query("SELECT id, TS, AMOUNT, PNL FROM history ORDER BY TS ASC");
+    const [rows] = await pool.query(SELECT_HISTORY_SQL);
     return Array.isArray(rows) ? rows : [];
   } catch (e) {
     console.error("[DB] history read failed:", e?.message || e);
@@ -249,7 +275,7 @@ async function upsertTodayHistory(amount) {
     throw new Error("history 테이블이 없습니다. (DB에 history 테이블 생성 필요)");
   }
 
-  const ts = todayTS();
+  const ts = todayTS(); // ✅ KST 기준 YYYY-MM-DD
   const amt = Number(amount);
   if (!Number.isFinite(amt)) throw new Error("amount must be a number");
 
@@ -268,6 +294,7 @@ async function upsertTodayHistory(amount) {
   const pnl =
     prev === null || !Number.isFinite(prev) || prev === 0 ? 0 : ((amt - prev) / prev) * 100;
 
+  // (형님 기존 방식 유지) 오늘은 1개만 유지
   await pool.query("DELETE FROM history WHERE TS = ?", [ts]);
   await pool.query("INSERT INTO history (TS, AMOUNT, PNL) VALUES (?, ?, ?)", [ts, amt, pnl]);
 
@@ -318,7 +345,7 @@ app.post("/api/adena/delta", async (req, res, next) => {
   }
 });
 
-// ✅ /api/history
+// ✅ /api/history  (TS: YYYY-MM-DD 문자열)
 app.get("/api/history", async (req, res, next) => {
   try {
     const rows = await readHistoryFromDB();
@@ -346,7 +373,7 @@ app.post("/api/history/today", async (req, res, next) => {
     res.json({
       bonus,
       adena: Number(adenaOut.adena || 0),
-      history,
+      history, // ✅ TS 문자열로 내려감
     });
   } catch (e) {
     next(e);
@@ -548,7 +575,7 @@ app.get("/api/bglist", async (req, res, next) => {
   }
 });
 
-// ✅ /api/all
+// ✅ /api/all  (history.TS가 YYYY-MM-DD 문자열로 내려감)
 app.get("/api/all", async (req, res, next) => {
   try {
     const [adenaOut, history, bgmusic, bglist] = await Promise.all([
@@ -560,7 +587,7 @@ app.get("/api/all", async (req, res, next) => {
 
     res.json({
       adena: adenaOut.adena,
-      history,
+      history, // ✅ 여기서 이제 ISO(Z) 안 나옴
       bgmusic,
       bglist,
       meta: {
