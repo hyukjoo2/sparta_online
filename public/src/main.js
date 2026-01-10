@@ -42,7 +42,8 @@ import { detectApiOriginIfNeeded } from "/src/app/api.js";
 import { createChatRotation } from "/src/app/chatRotation.js";
 import { createLlmChat } from "/src/app/llmChat.js";
 import { createAiPopup } from "/src/app/aiPopup.js";
-import { createHistoryTool } from "/src/app/historyTool.js";
+// ✅ Tool 메뉴의 History 항목 제거를 위해 HistoryTool 사용 안 함
+// import { createHistoryTool } from "/src/app/historyTool.js";
 import { createMatrixTool } from "/src/app/matrixTool.js";
 import { createDbFlow } from "/src/app/dbFlow.js";
 
@@ -82,13 +83,6 @@ import { createDbFlow } from "/src/app/dbFlow.js";
 
   // ==========================================================
   // ✅ Ctrl+T : 채팅창(로그 영역) 높이 "5배 ↔ 원복" 토글
-  // - base(원래 높이)는 최초 1회만 측정/확정
-  // - 토글 ON : height = base * 2 (px)
-  // - 토글 OFF: inline style을 원복해서 "진짜 원래 CSS"로 복귀
-  //
-  // ✔️ Ctrl+T가 안 먹는 대표 원인:
-  // - 브라우저 기본 새 탭 단축키가 먼저 먹음 → capture:true + preventDefault로 강제 차단
-  // - 높이를 %/auto로 쓰는 레이아웃 → base를 computed height(px)로 확정 후 px로 적용
   // ==========================================================
   let __chatHotkeyBound = false;
   let __chatToggled = false;
@@ -119,7 +113,6 @@ import { createDbFlow } from "/src/app/dbFlow.js";
       return __chatBaseHeightPx;
     }
 
-    // 현재 렌더링된 실제 높이를 base로 확정
     const cs = window.getComputedStyle(target);
     const h = parseFloat(cs.height);
 
@@ -140,7 +133,6 @@ import { createDbFlow } from "/src/app/dbFlow.js";
     _backupInlineStyleOnce(target);
 
     if (pxOrNull == null) {
-      // 원복: inline을 원래대로 되돌려 "CSS 원래 규칙"이 다시 지배하게
       target.style.height = __chatStyleBackup.height;
       target.style.maxHeight = __chatStyleBackup.maxHeight;
       target.style.minHeight = __chatStyleBackup.minHeight;
@@ -148,14 +140,10 @@ import { createDbFlow } from "/src/app/dbFlow.js";
       target.style.overflowY = __chatStyleBackup.overflowY;
     } else {
       target.style.height = `${Math.round(pxOrNull)}px`;
-      // 기존에 max-height가 박혀있으면 2배 적용이 무효가 될 수 있어서 제거
       target.style.maxHeight = "none";
-      // 혹시 overflow가 숨김이면 스크롤이 안 보여서 체감이 없을 수 있음
-      // 기존 스타일을 존중하고 싶으면 아래 2줄은 지워도 됨
       if (!target.style.overflowY) target.style.overflowY = "auto";
     }
 
-    // 레이아웃 변경 후 인디케이터 재배치
     try {
       syncQuotaTickerPosition();
     } catch (_) {}
@@ -172,10 +160,9 @@ import { createDbFlow } from "/src/app/dbFlow.js";
       _applyChatHeight(base * 5);
     } else {
       __chatToggled = false;
-      _applyChatHeight(null); // 원복
+      _applyChatHeight(null);
     }
 
-    // 입력 포커스 유지
     try {
       if (el?.consoleInput && typeof el.consoleInput.focus === "function") {
         el.consoleInput.focus();
@@ -190,15 +177,8 @@ import { createDbFlow } from "/src/app/dbFlow.js";
     window.addEventListener(
       "keydown",
       (e) => {
-        // Ctrl+T
-        if (
-          !e.ctrlKey ||
-          !(e.key?.toLowerCase() === "t" || e.key === "ㅅ")
-        ) {
-          return;
-        }
+        if (!e.ctrlKey || !(e.key?.toLowerCase() === "t" || e.key === "ㅅ")) return;
 
-        // 브라우저 기본(새 탭) 방지
         e.preventDefault();
         e.stopPropagation();
 
@@ -287,7 +267,6 @@ import { createDbFlow } from "/src/app/dbFlow.js";
   const { openCalculator } = createCalculatorModal({ openModal, getPrevAndCurrForDisplay });
 
   function applyChatVisibility() {
-    // 현재는 항상 true (기존 동일)
     el.consoleLog.style.display = "block";
   }
 
@@ -427,8 +406,8 @@ import { createDbFlow } from "/src/app/dbFlow.js";
     saveChatLogAsync,
   });
 
-  // ===== History Tool menu =====
-  const historyTool = createHistoryTool({ closeAllMenus2, openHistory });
+  // ✅ Tool 메뉴 History 삽입 제거: HistoryTool 생성/바인딩 안 함
+  // const historyTool = createHistoryTool({ closeAllMenus2, openHistory });
 
   // ===== Matrix Tool =====
   const matrixTool = createMatrixTool({
@@ -457,15 +436,6 @@ import { createDbFlow } from "/src/app/dbFlow.js";
       await db.reloadFromDB(true);
     });
     el.saveOpenedBtn.addEventListener("click", async () => {
-      closeAllMenus2();
-      await db.saveTodayToDB();
-    });
-
-    el.mobileSaveBtn.addEventListener("click", async () => {
-      closeAllMenus2();
-      await db.saveTodayToDB();
-    });
-    el.downloadBtn.addEventListener("click", async () => {
       closeAllMenus2();
       await db.saveTodayToDB();
     });
@@ -542,15 +512,14 @@ import { createDbFlow } from "/src/app/dbFlow.js";
   ai.bindAiMenuActions();
 
   matrixTool.bindMatrixToolAction(() => getState().entries);
-  historyTool.bindHistoryToolAction();
+  // ✅ Tool 메뉴 History 삽입 제거: 바인딩 호출도 제거
+  // historyTool.bindHistoryToolAction();
 
   // Matrix 안 들어가도 은행 이벤트 들어올 수 있으니, 여기서도 1회 바인딩
   db.bindBankDepositEventOnce();
 
-  // 인디케이터 DOM 미리 준비
   ensureBusyIndicator();
 
-  // ✅ Ctrl+T 높이 2배 토글 바인딩
   bindChatHeightHotkeyOnce();
 
   audio.initAudio();

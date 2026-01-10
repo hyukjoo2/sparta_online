@@ -19,8 +19,6 @@ export function getDomRefs(doc = document) {
 
     openBtn: doc.getElementById("openBtn"),
     saveOpenedBtn: doc.getElementById("saveOpenedBtn"),
-    mobileSaveBtn: doc.getElementById("mobileSaveBtn"),
-    downloadBtn: doc.getElementById("downloadBtn"),
 
     historyBtn: doc.getElementById("historyBtn"),
     reloadBtn: doc.getElementById("reloadBtn"),
