@@ -81,7 +81,7 @@ import { createDbFlow } from "/src/app/dbFlow.js";
   }
 
   // ==========================================================
-  // ✅ Ctrl+T : 채팅창(로그 영역) 높이 "2배 ↔ 원복" 토글
+  // ✅ Ctrl+T : 채팅창(로그 영역) 높이 "5배 ↔ 원복" 토글
   // - base(원래 높이)는 최초 1회만 측정/확정
   // - 토글 ON : height = base * 2 (px)
   // - 토글 OFF: inline style을 원복해서 "진짜 원래 CSS"로 복귀
@@ -567,7 +567,7 @@ import { createDbFlow } from "/src/app/dbFlow.js";
   background.applyScreenState();
 
   setState((s) => ({ ...s, fileLinked: false }));
-  setFileStatus(el, "eDB: (미연결)");
+  setFileStatus(el, "DB: (미연결)");
 
   adenaTimerFeature.start();
 

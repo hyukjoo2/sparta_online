@@ -13,134 +13,132 @@
 <link rel="stylesheet" href="/assets/styles/orb.css" />
 <link rel="stylesheet" href="/assets/styles/modal.css" />
 
-<!-- ✅ (NEW) AI 팝업 전용 스타일 (기존 CSS 안 건드리고 추가만) -->
+<!-- ✅ (NEW) AppShell 전용 스타일 -->
 <style>
-  .ai-backdrop{
+  /* =========================
+     AppShell (Top-left)
+  ========================== */
+  .top-left-shell{
     position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,.55);
-    display: none;
-    align-items: center;
-    justify-content: center;
-
-    /* 🔥 최상위 레이어 */
-    z-index: 2147483647; /* max safe z-index */
-  }
-  .ai-backdrop[aria-hidden="false"]{ display:flex; }
-
-  .ai-modal{
-    width: min(920px, calc(100vw - 24px));
-    height: min(680px, calc(100vh - 24px));
-    background: rgba(10,12,18,.92);
-    border: 1px solid rgba(255,255,255,.18);
-    border-radius: 14px;
-    box-shadow: 0 20px 60px rgba(0,0,0,.5);
-    overflow: hidden;
+    top: 14px;
+    left: 14px;
     display: flex;
-    flex-direction: column;
-    backdrop-filter: blur(8px);
+    align-items: center;
+    gap: 10px;
+    z-index: 2147482500; /* ✅ toolbar/console보다 위 */
+    pointer-events: none; /* 내부만 클릭 */
+  }
+  .top-left-shell > *{ pointer-events: auto; }
+
+  .app-shell{
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
   }
 
-  .ai-header{
+  .app-shell-btn{
+    width: 46px;
+    height: 38px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,.18);
+    background: rgba(10,12,18,.55);
+    color: rgba(255,255,255,.92);
+    cursor: pointer;
     display:flex;
     align-items:center;
-    gap:10px;
-    padding: 12px 14px;
-    border-bottom: 1px solid rgba(255,255,255,.12);
+    justify-content:center;
+    box-shadow: 0 10px 28px rgba(0,0,0,.35);
+    backdrop-filter: blur(6px);
   }
-  .ai-title{
+  .app-shell-btn:active{ transform: translateY(1px); }
+
+  .app-shell-panel{
+    position: absolute;
+    top: 46px;
+    left: 0;
+    width: 340px;
+
+    padding: 10px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,.14);
+    background: rgba(10,12,18,.92);
+    box-shadow: 0 20px 60px rgba(0,0,0,.55);
+
+    display: none;
+
+    /* ✅ 패널 내부 스크롤 */
+    max-height: calc(100vh - 120px);
+    overflow: auto;
+
+    /* ✅ 패널이 console 위로 */
+    z-index: 2147483646;
+  }
+  .app-shell-panel[aria-hidden="false"]{ display:block; }
+
+  .app-shell-title{
     font-family: Cinzel, serif;
     font-weight: 800;
     letter-spacing: .6px;
     color: rgba(255,255,255,.92);
-    font-size: 16px;
-    margin: 0;
+    font-size: 14px;
+    margin: 2px 4px 10px;
   }
-  .ai-sub{
-    margin-left:auto;
-    color: rgba(255,255,255,.55);
-    font-size: 12px;
-    white-space: nowrap;
+
+  /* ✅ 패널 안에 “기존 menubar”를 넣을 거라서,
+     메뉴 패널이 화면 밖 absolute로 뜨지 않게 내부 레이아웃으로 고정 */
+  .app-shell-panel .menubar{
+    display: grid;
+    gap: 10px;
   }
-  .ai-close{
-    margin-left: 10px;
-    width: 34px;
-    height: 34px;
+  .app-shell-panel .menu{
+    position: static !important;
+  }
+  .app-shell-panel .menu-btn{
+    width: 100%;
+    text-align: left;
+    padding: 10px 10px;
     border-radius: 10px;
-    border: 1px solid rgba(255,255,255,.18);
+    border: 1px solid rgba(255,255,255,.14);
     background: rgba(255,255,255,.06);
-    color: rgba(255,255,255,.92);
-    cursor: pointer;
-    font-weight: 900;
-  }
-
-  .ai-body{
-    flex: 1;
-    padding: 14px;
-    overflow: auto;
-  }
-
-  .ai-msg{
-    max-width: 86%;
-    padding: 10px 12px;
-    border-radius: 12px;
-    margin: 10px 0;
-    line-height: 1.35;
-    font-size: 14px;
-    white-space: pre-wrap;
-    word-break: break-word;
-    border: 1px solid rgba(0,0,0,.08);
-  }
-
-  /* ✅ 사용자: 흰 배경 + 검정 글씨 + 박스 */
-  .ai-msg.user{
-    margin-left: auto;
-    background: #ffffff;
-    color: #111111;
-  }
-
-  /* ✅ AI: 옅은 회색 + 검정 글씨 + 박스 */
-  .ai-msg.ai{
-    margin-right: auto;
-    background: #e9e9e9;
-    color: #111111;
-  }
-
-  .ai-footer{
-    padding: 12px 14px;
-    border-top: 1px solid rgba(255,255,255,.12);
-    display:flex;
-    gap:10px;
-    align-items:center;
-  }
-
-  .ai-input{
-    flex: 1;
-    height: 42px;
-    border-radius: 12px;
-    border: 1px solid rgba(255,255,255,.18);
-    background: rgba(255,255,255,.08);
-    color: rgba(255,255,255,.92);
-    padding: 0 12px;
-    outline: none;
-    font-size: 14px;
-  }
-  .ai-input::placeholder{ color: rgba(255,255,255,.5); }
-
-  .ai-send{
-    height: 42px;
-    padding: 0 14px;
-    border-radius: 12px;
-    border: 1px solid rgba(255,255,255,.18);
-    background: rgba(255,255,255,.12);
-    color: rgba(255,255,255,.92);
+    color: rgba(255,255,255,.90);
     cursor: pointer;
     font-weight: 800;
   }
-  .ai-send:disabled{
-    opacity: .55;
-    cursor: not-allowed;
+  /* ✅ 각 그룹(기존 menu-panel)을 “항상 보이게” 해서 AppShell 안에서 바로 버튼 누르게 */
+  .app-shell-panel .menu-panel{
+    position: static !important;
+    display: block !important;
+    margin-top: 8px;
+    padding: 10px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,.10);
+    background: rgba(255,255,255,.04);
+    box-shadow: none !important;
   }
+  .app-shell-panel .menu-item{
+    width: 100%;
+    text-align: left;
+    padding: 10px 10px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,.14);
+    background: rgba(255,255,255,.06);
+    color: rgba(255,255,255,.90);
+    cursor: pointer;
+    font-weight: 800;
+    margin-bottom: 8px;
+  }
+  .app-shell-panel .menu-item:last-child{ margin-bottom: 0; }
+  .app-shell-panel .menu-item:hover{ background: rgba(255,255,255,.10); }
+
+  .app-shell-panel .menu-sep{
+    height: 1px;
+    background: rgba(255,255,255,.10);
+    margin: 10px 0;
+  }
+
+  /* ✅ pnl-badge를 Top-left-shell 안에 넣었으니 fixed 제거 */
+  .pnl-badge{ position: static !important; }
 </style>
 </head>
 
@@ -149,10 +147,73 @@
 <div class="bg-layer" id="bgB"></div>
 <div class="overlay"></div>
 
-<div class="pnl-badge" id="pnlBadge">
-  <span class="coin" aria-hidden="true">💰</span>
-  <span class="val" id="pnlText">-</span>
-  <span class="timer" id="adenaTimer">60:00</span>
+<!-- ✅ 왼쪽 상단: AppShell + 💰 -->
+<div class="top-left-shell" aria-label="AppShell + Adena HUD">
+  <div class="app-shell" aria-label="AppShell">
+    <button class="app-shell-btn" id="appShellBtn" type="button" title="AppShell">
+      <!-- 9-dot 아이콘 -->
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+        <circle cx="5" cy="5" r="1.5"></circle>
+        <circle cx="12" cy="5" r="1.5"></circle>
+        <circle cx="19" cy="5" r="1.5"></circle>
+        <circle cx="5" cy="12" r="1.5"></circle>
+        <circle cx="12" cy="12" r="1.5"></circle>
+        <circle cx="19" cy="12" r="1.5"></circle>
+        <circle cx="5" cy="19" r="1.5"></circle>
+        <circle cx="12" cy="19" r="1.5"></circle>
+        <circle cx="19" cy="19" r="1.5"></circle>
+      </svg>
+    </button>
+
+    <div class="app-shell-panel" id="appShellPanel" aria-hidden="true">
+      <div class="app-shell-title">AppShell</div>
+
+      <!-- ✅ 중요: 기존 menubar 구조를 “그대로” 넣음 (menu.js / main.js / Matrix 자동삽입 유지) -->
+      <div class="menubar" role="menubar" aria-label="Toolbar Menus">
+        <div class="menu" data-menu="file">
+          <button class="menu-btn" type="button" id="fileMenuBtn">File ▾</button>
+          <div class="menu-panel" role="menu">
+            <button class="menu-item" type="button" id="openBtn">DB Reload (ALL tables)</button>
+            <button class="menu-item" type="button" id="saveOpenedBtn">오늘 값 DB 저장 (history upsert)</button>
+            <div class="menu-sep"></div>
+            <button class="menu-item" type="button" id="mobileSaveBtn">모바일 저장</button>
+            <button class="menu-item" type="button" id="downloadBtn">다운로드</button>
+          </div>
+        </div>
+
+        <div class="menu" data-menu="view">
+          <button class="menu-btn" type="button" id="viewMenuBtn">View ▾</button>
+          <div class="menu-panel" role="menu">
+            <button class="menu-item" type="button" id="historyBtn">History</button>
+            <button class="menu-item" type="button" id="reloadBtn">Reload (DB ALL)</button>
+          </div>
+        </div>
+
+        <div class="menu" data-menu="tools">
+          <button class="menu-btn" type="button" id="toolsMenuBtn">Tool ▾</button>
+          <div class="menu-panel" role="menu">
+            <button class="menu-item" type="button" id="ocoBtn">OCO Quick Calc</button>
+            <button class="menu-item" type="button" id="calcBtn">계산기</button>
+            <!-- ✅ Matrix는 main.js가 여기 #matrixBtn를 자동 삽입하는 구조(유지) -->
+          </div>
+        </div>
+
+        <div class="menu" data-menu="ai">
+          <button class="menu-btn" type="button" id="aiBtn">Ai</button>
+          <!-- aiPopup.js가 잡는 ID 유지 -->
+          <div class="menu-panel" role="menu">
+            <button class="menu-item" type="button" id="aiOpenBtn">Open AI Popup</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pnl-badge" id="pnlBadge">
+    <span class="coin" aria-hidden="true">💰</span>
+    <span class="val" id="pnlText">-</span>
+    <span class="timer" id="adenaTimer">60:00</span>
+  </div>
 </div>
 
 <div class="center-logo">
@@ -213,39 +274,7 @@
          placeholder="가격 입력 (Enter로 UI 반영)"
          autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="decimal">
 
-  <div class="menubar" role="menubar" aria-label="Toolbar Menus">
-    <div class="menu" data-menu="file">
-      <button class="menu-btn" type="button" id="fileMenuBtn">File ▾</button>
-      <div class="menu-panel" role="menu">
-        <button class="menu-item" type="button" id="openBtn">DB Reload (ALL tables)</button>
-        <button class="menu-item" type="button" id="saveOpenedBtn">오늘 값 DB 저장 (history upsert)</button>
-        <div class="menu-sep"></div>
-        <button class="menu-item" type="button" id="mobileSaveBtn">DB 저장(동일)</button>
-        <button class="menu-item" type="button" id="downloadBtn">DB 저장(동일)</button>
-      </div>
-    </div>
-
-    <div class="menu" data-menu="view">
-      <button class="menu-btn" type="button">View ▾</button>
-      <div class="menu-panel" role="menu">
-        <button class="menu-item" type="button" id="historyBtn">History</button>
-        <button class="menu-item" type="button" id="reloadBtn">Reload (DB ALL)</button>
-      </div>
-    </div>
-
-    <div class="menu" data-menu="tools">
-      <button class="menu-btn" type="button">Tool ▾</button>
-      <div class="menu-panel" role="menu">
-        <button class="menu-item" type="button" id="ocoBtn">OCO Quick Calc</button>
-        <button class="menu-item" type="button" id="calcBtn">계산기</button>
-      </div>
-    </div>
-
-    <!-- ✅ Ai 버튼 -->
-    <div class="menu" data-menu="ai">
-      <button class="menu-btn" type="button" id="aiBtn">Ai</button>
-    </div>
-  </div>
+  <!-- ✅ menubar는 AppShell 패널로 이동 -->
 
   <div class="toolbar-center">
     <div class="countdown-hud" aria-label="Countdown HUD">
@@ -319,24 +348,6 @@
   </div>
 </div>
 
-<!-- ✅ (NEW) AI 팝업 -->
-<div class="ai-backdrop" id="aiBackdrop" aria-hidden="true">
-  <div class="ai-modal" role="dialog" aria-modal="true" aria-labelledby="aiTitle">
-    <div class="ai-header">
-      <h2 class="ai-title" id="aiTitle">AI CHAT</h2>
-      <div class="ai-sub" id="aiStatus">ready</div>
-      <button class="ai-close" type="button" id="aiCloseBtn">✕</button>
-    </div>
-
-    <div class="ai-body" id="aiChatBody" aria-label="AI conversation"></div>
-
-    <div class="ai-footer">
-      <input class="ai-input" id="aiInput" type="text" placeholder="메시지 입력..." autocomplete="off" />
-      <button class="ai-send" id="aiSendBtn" type="button">Send</button>
-    </div>
-  </div>
-</div>
-
 <div class="bottom-console" aria-label="Command console">
   <textarea id="consoleLog" class="console-log" readonly
     placeholder="명령어 결과가 여기에 누적됩니다."></textarea>
@@ -351,132 +362,30 @@
   </div>
 </div>
 
-<!-- ✅ JS 분리 -->
 <script type="module" src="/src/main.js"></script>
 
-<!-- ✅ (NEW) AI 팝업 로직 -->
+<!-- ✅ AppShell 토글 (menu.js 건드리지 않고 여기서 처리) -->
 <script>
   window.addEventListener("DOMContentLoaded", () => {
-    const aiBtn = document.getElementById("aiBtn");
-    const aiBackdrop = document.getElementById("aiBackdrop");
-    const aiCloseBtn = document.getElementById("aiCloseBtn");
-    const aiChatBody = document.getElementById("aiChatBody");
-    const aiInput = document.getElementById("aiInput");
-    const aiSendBtn = document.getElementById("aiSendBtn");
-    const aiStatus = document.getElementById("aiStatus");
+    const btn = document.getElementById("appShellBtn");
+    const panel = document.getElementById("appShellPanel");
 
-    // ✅ Ollama/FastAPI(또는 네가 만든 LLM 서버) 엔드포인트
-    // main.js에서도 쓰던 그 값으로 맞춤
-    const LLM_ENDPOINT = "http://127.0.0.1:8000/chat";
-    const LLM_MAX_TURNS = 20;
+    function isOpen(){ return panel?.getAttribute("aria-hidden") === "false"; }
+    function open(){ panel?.setAttribute("aria-hidden","false"); }
+    function close(){ panel?.setAttribute("aria-hidden","true"); }
+    function toggle(){ if (!panel) return; isOpen() ? close() : open(); }
 
-    // AI 대화 히스토리(팝업 전용)
-    const aiMessages = [
-      { role: "system", content: "You are a helpful assistant. Answer in Korean, concise." },
-    ];
-
-    function trimHistory() {
-      const keep = 1 + LLM_MAX_TURNS * 2;
-      if (aiMessages.length > keep) aiMessages.splice(1, aiMessages.length - keep);
-    }
-
-    function openAiPopup() {
-      aiBackdrop.setAttribute("aria-hidden", "false");
-      // 첫 오픈 시 포커스
-      setTimeout(() => { try { aiInput.focus(); } catch {} }, 0);
-    }
-
-    function closeAiPopup() {
-      aiBackdrop.setAttribute("aria-hidden", "true");
-    }
-
-    function addBubble(kind, text) {
-      const div = document.createElement("div");
-      div.className = "ai-msg " + (kind === "user" ? "user" : "ai");
-      div.textContent = String(text ?? "");
-      aiChatBody.appendChild(div);
-      aiChatBody.scrollTop = aiChatBody.scrollHeight;
-    }
-
-    async function sendToAi(userText) {
-      const msg = String(userText || "").trim();
-      if (!msg) return;
-
-      // 내 말
-      addBubble("user", msg);
-
-      aiMessages.push({ role: "user", content: msg });
-      trimHistory();
-
-      aiStatus.textContent = "thinking...";
-      aiSendBtn.disabled = true;
-      aiInput.disabled = true;
-
-      try {
-        const res = await fetch(LLM_ENDPOINT, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: aiMessages }),
-        });
-
-        if (!res.ok) throw new Error("HTTP " + res.status);
-
-        const data = await res.json();
-        const content = String(data?.content ?? "").trim();
-        if (!content) throw new Error("빈 응답");
-
-        aiMessages.push({ role: "assistant", content });
-        trimHistory();
-
-        // AI 답
-        addBubble("ai", content);
-        aiStatus.textContent = "ready";
-      } catch (e) {
-        addBubble("ai", "연결 오류: AI 서버를 확인하세요. (" + (e?.message ?? e) + ")");
-        aiStatus.textContent = "error";
-      } finally {
-        aiSendBtn.disabled = false;
-        aiInput.disabled = false;
-        try { aiInput.focus(); } catch {}
-      }
-    }
-
-    // 버튼 바인딩
-    aiBtn?.addEventListener("click", openAiPopup);
-    aiCloseBtn?.addEventListener("click", closeAiPopup);
-
-    // 바깥 클릭하면 닫기(모달 밖 클릭)
-    aiBackdrop?.addEventListener("click", (e) => {
-      if (e.target === aiBackdrop) closeAiPopup();
+    btn?.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggle();
     });
 
-    // ESC로 닫기
-    window.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && aiBackdrop.getAttribute("aria-hidden") === "false") {
-        closeAiPopup();
-      }
-    });
+    panel?.addEventListener("click", (e) => e.stopPropagation());
 
-    // 전송
-    aiSendBtn?.addEventListener("click", () => {
-      const text = aiInput.value;
-      aiInput.value = "";
-      sendToAi(text);
-    });
-
-    aiInput?.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        const text = aiInput.value;
-        aiInput.value = "";
-        sendToAi(text);
-      }
-    });
-
-    // 첫 안내(원하면 삭제)
-    addBubble("ai", "AI 채팅 준비 완료. 메시지를 입력해 주세요.");
+    window.addEventListener("click", () => { if (isOpen()) close(); });
+    window.addEventListener("keydown", (e) => { if (e.key === "Escape" && isOpen()) close(); });
   });
 </script>
-
 </body>
 </html>
