@@ -48,7 +48,7 @@ export function createLlmChat({
     llmMessages.push({ role: "user", content: text });
     trimLlmHistory(llmMessages);
 
-    appendLog(`[Sparta군주] ${text}`);
+    appendLog(`[NEO] ${text}`);
 
     // 내가 입력한 채팅 원문 저장
     saveChatLogAsync(text);

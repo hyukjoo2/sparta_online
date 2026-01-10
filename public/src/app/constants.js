@@ -39,21 +39,14 @@ export const LLM_MAX_TURNS = 20;
 export const USE_OLLAMA_ON_NORMAL_CHAT = true;
 
 export const OLLAMA_SPEAKER_POOL = [
-  "헤헤곰인형",
-  "사탕쥴게가자",
-  "생각창고",
-  "얼마즐",
-  "천마대혈겁풍",
-  "자면족밥된다",
-  "암바시술소",
-  "척추절단에바",
-  "미스릴수저",
-  "엘릭서마시고싶다",
-  "도펠광어",
-  "헨젤과그랫데",
-  "네크로멘시",
-  "두딸모두오크",
-  "조카신발색깔",
+  "모피어스",
+  "트리니티",
+  "사이퍼",
+  "탱크",
+  "Agent Jones",
+  "Agent Brown",
+  "White Rabbit",
+  "Spoon Boy",
 ];
 
 // API Origin detect

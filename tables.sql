@@ -33,7 +33,13 @@ CREATE TABLE bgmusic (
 -- 예시 데이터
 TRUNCATE TABLE bgmusic;
 -- INSERT INTO bgmusic (filename, sort_order) VALUES ('./bgmusic/00_lineage.mp3', 1);
-INSERT INTO bgmusic (filename, sort_order) VALUES ('./bgmusic/01_Recluse.mp3', 1);
+-- INSERT INTO bgmusic (filename, sort_order) VALUES ('./bgmusic/01_Recluse.mp3', 1);
+-- INSERT INTO bgmusic (filename, sort_order) VALUES ('./bgmusic/the_red_pill_proud_music_preview.mp3', 1);
+INSERT INTO bgmusic (filename, sort_order) VALUES ('./bgmusic/Eve_Had_A_Dream_Neo(Combined_Mix).mp3', 1);
+INSERT INTO bgmusic (filename, sort_order) VALUES ('./bgmusic/The_Skull_(Dance_Mix).mp3', 2);
+INSERT INTO bgmusic (filename, sort_order) VALUES ('./bgmusic/1-55_Chateau_(Part_I_Battle_With_The_Henchmen).mp3', 3);
+INSERT INTO bgmusic (filename, sort_order) VALUES ('./bgmusic/1-56_Chateau_(Part_II_Three_Doors).mp3', 4);
+INSERT INTO bgmusic (filename, sort_order) VALUES ('./bgmusic/1-57_Chateau_(Part_III_Lost_In_The_Dungeon).mp3', 5);
 
 
 CREATE TABLE bglist (
@@ -51,7 +57,8 @@ CREATE TABLE bglist (
 -- 예시 데이터
 TRUNCATE TABLE bglist;
 -- INSERT INTO bglist (filename, sort_order) VALUES ('./bglist/background_ep01_00.jpg', 1);
-INSERT INTO bglist (filename, sort_order) VALUES ('./bglist/background_ep01_01.png', 1);
+-- INSERT INTO bglist (filename, sort_order) VALUES ('./bglist/background_ep01_01.png', 1);
+INSERT INTO bglist (filename, sort_order) VALUES ('./bglist/matrix_ep01_00.gif', 1);
 
 
 CREATE TABLE history (

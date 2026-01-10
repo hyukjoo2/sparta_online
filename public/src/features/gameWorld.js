@@ -2,12 +2,12 @@
 // /src/features/gameWorld.js
 // GameWorld (Fullscreen-aware)
 //
-// ✅ 형님 요청 반영(마을 절반 크기 + 재진입 + 화면 끝 청크 이동 + 마을 내부 EXIT + 고블린 NPC)
+// ✅ 형님 요청 반영(마을 절반 크기 + 재진입 + 화면 끝 청크 이동 + 마을 내부 EXIT + Agen NPC)
 // ✅ 추가(아데나 💰):
 // - 💰는 청크마다 랜덤(결정론적) 생성
 // - 화면 왼쪽 위에 💰 총량 표시
 // - 플레이어가 💰에 닿으면 💰 +1 (죽음/리젠 없음)
-// - ✅ 고블린과 부딪혀서 죽고 마을 리젠될 때 💰을 0으로 초기화
+// - ✅ Agen과 부딪혀서 죽고 마을 리젠될 때 💰을 0으로 초기화
 //
 // ✅ 추가(은행 🏦):
 // - (0,0) 마을 내부 "왼쪽 아래"에 은행 건물 생성
@@ -18,7 +18,7 @@
 // ✅ 추가(전투 - 칼 공격):
 // - 스페이스바로 공격
 // - 전방 60도 부채꼴 + 맞으면 즉사
-// - 고블린 사망 시 10% 확률로 💰 드랍 (1~10개), 드랍된 💰은 기존 픽업 로직(개당 +1) 사용
+// - Agen 사망 시 10% 확률로 💰 드랍 (1~10개), 드랍된 💰은 기존 픽업 로직(개당 +1) 사용
 
 export function createGameWorldFeature({
   el,
@@ -192,7 +192,7 @@ export function createGameWorldFeature({
     return c > vr.leftC && c < vr.rightC && r > vr.topC && r < vr.bottomC;
   }
 
-  // ✅ NPC가 "마을 내부"에 있는지 (고블린 진입 금지용)
+  // ✅ NPC가 "마을 내부"에 있는지 (Agen 진입 금지용)
   function npcInVillageInterior(nx, ny, radius) {
     if (!(state.worldX === 0 && state.worldY === 0)) return false;
     const vr = state.chunkMeta?.villageRect;
@@ -352,7 +352,7 @@ export function createGameWorldFeature({
   }
 
   function respawnInVillage() {
-    // ✅ 형님 요청: 고블린 죽음 리젠 시 아데나 초기화
+    // ✅ 형님 요청: Agen 죽음 리젠 시 아데나 초기화
     state.money = 0;
     state.moneyFlashT = 0;
 
@@ -609,7 +609,7 @@ export function createGameWorldFeature({
       npcs.push({
         id,
         type: "goblin",
-        name: "고블린",
+        name: "Agen",
         x,
         y,
         r: 10,
@@ -653,7 +653,7 @@ export function createGameWorldFeature({
       nx = clamp(nx, n.r, state.chunkW - n.r);
       ny = clamp(ny, n.r, state.chunkH - n.r);
 
-      // 고블린 마을 내부 진입 차단
+      // Agen 마을 내부 진입 차단
       if (npcInVillageInterior(nx, ny, n.r)) {
         if (npcInVillageInterior(n.x, n.y, n.r)) {
           const vr = state.chunkMeta?.villageRect;
@@ -1200,7 +1200,7 @@ export function createGameWorldFeature({
     // ✅ 먼저 아데나 픽업(죽지 않음)
     checkCoinPickup();
 
-    // ✅ 고블린 충돌은 "죽음/리젠" (+ 아데나 0 초기화는 respawn에서)
+    // ✅ Agen 충돌은 "죽음/리젠" (+ 아데나 0 초기화는 respawn에서)
     if (checkGoblinCollision()) return;
 
     // 청크 이동
@@ -1500,7 +1500,7 @@ export function createGameWorldFeature({
     ctx.fillStyle = "rgba(255,255,255,0.85)";
     ctx.font = "12px sans-serif";
     ctx.fillText(
-      `WASD/Arrow 이동 | 클릭 이동 | Space=칼 공격(전방 60° 즉사) | 💰 획득=+1 | 🏦 BANK=입금(💰→DB) | 고블린 충돌=죽음(💰 0 리셋) | 화면 끝=다음 청크`,
+      `WASD/Arrow 이동 | 클릭 이동 | Space=칼 공격(전방 60° 즉사) | 💰 획득=+1 | 🏦 BANK=입금(💰→DB) | Agen 충돌=죽음(💰 0 리셋) | 화면 끝=다음 청크`,
       12,
       18
     );

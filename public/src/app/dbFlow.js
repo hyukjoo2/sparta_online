@@ -21,6 +21,66 @@ export function createDbFlow({
   // 은행 입금 pending (DB 미연결 때 누적)
   let pendingBankDeposit = 0;
 
+  // ==========================================================
+  // ✅ Money FX (earn/loss gif overlay)
+  // ==========================================================
+  let __moneyFxEl = null;
+  let __moneyFxTimer = null;
+
+  function ensureMoneyFxOverlay() {
+    if (__moneyFxEl) return __moneyFxEl;
+
+    const wrap = document.createElement("div");
+    wrap.id = "moneyFxOverlay";
+    wrap.style.position = "fixed";
+    wrap.style.left = "50%";
+    wrap.style.top = "50%";
+    wrap.style.transform = "translate(-50%, -50%)";
+    wrap.style.zIndex = "2147483000";
+    wrap.style.pointerEvents = "none";
+    wrap.style.display = "none";
+
+    const img = document.createElement("img");
+    img.alt = "money-fx";
+    img.style.maxWidth = "70vw";
+    img.style.maxHeight = "70vh";
+    img.style.objectFit = "contain";
+    img.style.filter = "drop-shadow(0 10px 28px rgba(0,0,0,.55))";
+
+    wrap.appendChild(img);
+    document.body.appendChild(wrap);
+
+    __moneyFxEl = wrap;
+    return __moneyFxEl;
+  }
+
+  function showMoneyFx(kind /* 'earn' | 'loss' */, ms = 3000) {
+    const wrap = ensureMoneyFxOverlay();
+    const img = wrap.querySelector("img");
+    if (!img) return;
+
+    const src = kind === "earn" ? "/bglist/earn_money.gif" : "/bglist/loss_money.gif";
+    img.src = `${src}?t=${Date.now()}`; // cache bust
+
+    wrap.style.display = "block";
+
+    if (__moneyFxTimer) clearTimeout(__moneyFxTimer);
+    __moneyFxTimer = setTimeout(() => {
+      wrap.style.display = "none";
+    }, ms);
+  }
+
+  function maybeShowProfitFx(baseAmount, todayAmount) {
+    const prev = Number(baseAmount);
+    const curr = Number(todayAmount);
+    if (!Number.isFinite(prev) || !Number.isFinite(curr)) return;
+
+    const diff = curr - prev;
+    if (diff > 0) showMoneyFx("earn", 3000);
+    else if (diff < 0) showMoneyFx("loss", 3000);
+  }
+  // ==========================================================
+
   async function applyMediaConfigFromDB(nextBgmusic, nextBglist) {
     await audio.applyBgmusicFromDB(nextBgmusic);
     background.applyBgListFromDB(nextBglist);
@@ -134,13 +194,50 @@ export function createDbFlow({
     return null;
   }
 
-  function calcProfitBonusFromPrev(prevAmt, savedAmount) {
-    const prev = Number(prevAmt);
+  function getSameDayAmountFrom(historyArr, tsToday) {
+    const rows = (Array.isArray(historyArr) ? historyArr : [])
+      .filter((r) => r && r.TS != null && r.AMOUNT != null)
+      .map((r) => ({ ts: normalizeTS(r.TS), amt: Number(r.AMOUNT) }))
+      .filter((x) => x.ts && Number.isFinite(x.amt))
+      .filter((x) => String(x.ts) === String(tsToday));
+
+    // 같은 날이 여러 개면 "마지막" (정렬 필요하면 TS+id 기준인데, 여기선 배열 뒤에서부터 찾는 방식이 더 안전)
+    for (let i = rows.length - 1; i >= 0; i--) return rows[i].amt;
+    return null;
+  }
+
+  function getLastAmountFromEntries(entriesArr) {
+    const arr = Array.isArray(entriesArr) ? entriesArr : [];
+    for (let i = arr.length - 1; i >= 0; i--) {
+      const a = Number(arr[i]?.AMOUNT);
+      if (Number.isFinite(a)) return a;
+    }
+    return null;
+  }
+
+  function calcProfitBonusFromBase(baseAmt, savedAmount) {
+    const prev = Number(baseAmt);
     const curr = Number(savedAmount);
     if (!Number.isFinite(curr) || !Number.isFinite(prev)) return { profit: 0, bonus: 0, prev };
     const profit = Math.max(0, curr - prev);
     const bonus = round2(profit * 0.1);
     return { profit, bonus, prev };
+  }
+
+  function pickBaseAmountForDiff(entriesSnapshot, tsToday) {
+    // 1) 같은 날 값(오늘 overwrite 기준) 우선
+    const sameDay = getSameDayAmountFrom(entriesSnapshot, tsToday);
+    if (Number.isFinite(Number(sameDay))) return Number(sameDay);
+
+    // 2) 없으면 전일 값
+    const prevDay = getPrevDayAmountFrom(entriesSnapshot, tsToday);
+    if (Number.isFinite(Number(prevDay))) return Number(prevDay);
+
+    // 3) 그것도 없으면 직전 마지막 값
+    const last = getLastAmountFromEntries(entriesSnapshot);
+    if (Number.isFinite(Number(last))) return Number(last);
+
+    return null;
   }
 
   async function saveTodayToDB() {
@@ -155,7 +252,7 @@ export function createDbFlow({
     const tsToday = todayTS();
 
     const prevEntriesSnapshot = entries.slice();
-    const prevDayAmount = getPrevDayAmountFrom(prevEntriesSnapshot, tsToday);
+    const baseForDiff = pickBaseAmountForDiff(prevEntriesSnapshot, tsToday);
 
     setFileStatus(el, `DB: 저장 중... • TS=${tsToday}`);
 
@@ -175,19 +272,25 @@ export function createDbFlow({
 
       el.priceInput.value = "";
 
+      // ✅ 요구사항: 차익 +/- 시 중앙 GIF 3초 표시
+      // ✅ 버그 수정: base는 "같은날(오늘) 기존값" 우선
+      maybeShowProfitFx(baseForDiff, valueToSave);
+
       let bonusToApply = 0;
 
+      // 서버가 bonus를 내려주면 그걸 우선
       if (Number.isFinite(Number(out.bonus)) && Number(out.bonus) > 0) {
         bonusToApply = round2(Number(out.bonus));
       } else {
-        const { profit, bonus, prev } = calcProfitBonusFromPrev(prevDayAmount, valueToSave);
+        // ✅ 버그 수정: 보너스 계산도 "같은날 overwrite 기준"으로
+        const { profit, bonus, prev } = calcProfitBonusFromBase(baseForDiff, valueToSave);
         bonusToApply = Math.max(0, round2(bonus || 0));
 
         if (!Number.isFinite(Number(prev))) {
-          appendLog("[SYSTEM] 수익 보너스 계산 불가: 전일(이전일) 데이터가 없습니다.");
+          appendLog("[SYSTEM] 수익 보너스 계산 불가: 비교 기준 데이터가 없습니다.");
         } else {
           appendLog(
-            `[SYSTEM] 전일=${fmt2Plain(prev)} → 오늘=${fmt2Plain(valueToSave)} / 이익=${fmt2Plain(profit)} / 보너스=${fmt2Plain(
+            `[SYSTEM] 기준=${fmt2Plain(prev)} → 저장=${fmt2Plain(valueToSave)} / 이익=${fmt2Plain(profit)} / 보너스=${fmt2Plain(
               bonusToApply
             )}`
           );

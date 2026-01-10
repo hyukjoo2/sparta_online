@@ -203,7 +203,7 @@ export function createCommandsFeature(ctx) {
           return;
         }
 
-        appendLog(`[Sparta군주] ${v}`);
+        appendLog(`[NEO] ${v}`);
       }, 0);
     });
   }
