@@ -150,3 +150,69 @@ CREATE TABLE IF NOT EXISTS rag_chunk (
     ON UPDATE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+
+-- 네오 디비
+USE sparta;
+
+-- Neo 현재 스냅샷(재시작 복구 핵심)
+CREATE TABLE IF NOT EXISTS neo_state (
+  id INT NOT NULL PRIMARY KEY,
+  name VARCHAR(32) NOT NULL DEFAULT 'Neo',
+
+  anchor_real_ms BIGINT NOT NULL,
+  anchor_system_min INT NOT NULL,
+
+  last_real_ms BIGINT NOT NULL,
+  last_system_min INT NOT NULL,
+
+  system_day INT NOT NULL,
+  system_hour TINYINT NOT NULL,
+  system_minute TINYINT NOT NULL,
+
+  life_no INT NOT NULL,
+  age_years INT NOT NULL,
+  day_in_life INT NOT NULL,
+
+  status VARCHAR(24) NOT NULL,
+  location VARCHAR(120) NOT NULL,
+
+  last_thought TEXT NULL,
+  last_action  TEXT NULL,
+
+  -- ✅ 중복 방지용(필수급)
+  last_boundary_system_day INT NOT NULL DEFAULT 1,
+  last_event_system_min INT NOT NULL DEFAULT 0,
+
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- Neo 전체 행적 로그
+CREATE TABLE IF NOT EXISTS neo_log (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+
+  real_ms BIGINT NOT NULL,
+  system_min INT NOT NULL,
+  system_day INT NOT NULL,
+  system_hour TINYINT NOT NULL,
+  system_minute TINYINT NOT NULL,
+
+  life_no INT NOT NULL,
+  age_years INT NOT NULL,
+  day_in_life INT NOT NULL,
+
+  kind ENUM('SYSTEM','THOUGHT','MOVE','STATUS') NOT NULL,
+  status VARCHAR(24) NOT NULL,
+
+  location_from VARCHAR(120) NULL,
+  location_to   VARCHAR(120) NULL,
+
+  message TEXT NOT NULL,
+
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  KEY idx_system_min (system_min),
+  KEY idx_life_no (life_no),
+  KEY idx_created_at (created_at)
+) ENGINE=InnoDB;
+
+
