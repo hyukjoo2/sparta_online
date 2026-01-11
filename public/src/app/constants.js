@@ -39,6 +39,7 @@ export const LLM_MAX_TURNS = 20;
 export const USE_OLLAMA_ON_NORMAL_CHAT = true;
 
 export const OLLAMA_SPEAKER_POOL = [
+  "네오",
   "모피어스",
   "트리니티",
   "사이퍼",
