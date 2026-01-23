@@ -1,4 +1,3 @@
-// main.js
 // /src/main.js
 import { createHistoryModal } from "/src/features/history.js";
 import { createOcoCalcModal } from "/src/features/ocoCalc.js";
@@ -15,6 +14,8 @@ import { createGameWorldFeature } from "/src/features/gameWorld.js";
 import { createRenderUI } from "/src/ui/render.js";
 import { createModalUI } from "/src/ui/modal.js";
 import { createMenuUI } from "/src/ui/menu.js";
+
+import { createNeoClient } from "./app/neoClient.js";
 
 import {
   DEFAULT_BG_LIST,
@@ -406,9 +407,6 @@ import { createDbFlow } from "/src/app/dbFlow.js";
     saveChatLogAsync,
   });
 
-  // ✅ Tool 메뉴 History 삽입 제거: HistoryTool 생성/바인딩 안 함
-  // const historyTool = createHistoryTool({ closeAllMenus2, openHistory });
-
   // ===== Matrix Tool =====
   const matrixTool = createMatrixTool({
     el,
@@ -428,36 +426,6 @@ import { createDbFlow } from "/src/app/dbFlow.js";
 
     bindBankDepositEventOnce: () => db.bindBankDepositEventOnce(),
   });
-
-  // ===== Menu bindings =====
-  function bindMenuActions() {
-    el.openBtn.addEventListener("click", async () => {
-      closeAllMenus2();
-      await db.reloadFromDB(true);
-    });
-    el.saveOpenedBtn.addEventListener("click", async () => {
-      closeAllMenus2();
-      await db.saveTodayToDB();
-    });
-
-    el.historyBtn.addEventListener("click", () => {
-      closeAllMenus2();
-      openHistory();
-    });
-    el.reloadBtn.addEventListener("click", async () => {
-      closeAllMenus2();
-      await db.doReloadAction();
-    });
-
-    el.ocoBtn.addEventListener("click", () => {
-      closeAllMenus2();
-      openOcoQuickCalc();
-    });
-    el.calcBtn.addEventListener("click", () => {
-      closeAllMenus2();
-      openCalculator();
-    });
-  }
 
   // ===== 입력 → pendingValue → render =====
   function applyPriceFromInput() {
@@ -505,15 +473,71 @@ import { createDbFlow } from "/src/app/dbFlow.js";
     el.countdownText.textContent = `${days}일 ${pad2(hh)}:${pad2(mm)}:${pad2(ss)}`;
   }
 
+  function closeAppShellPanelIfOpen() {
+    const panel = document.getElementById("appShellPanel");
+    if (!panel) return;
+    panel.setAttribute("aria-hidden", "true");
+  }
+
   // ===== Boot =====
+  function bindMenuActions() {
+    el.openBtn.addEventListener("click", async () => {
+      closeAllMenus2();
+      closeAppShellPanelIfOpen(); // ✅ 추가
+      await db.reloadFromDB(true);
+    });
+
+    el.saveOpenedBtn.addEventListener("click", async () => {
+      closeAllMenus2();
+      closeAppShellPanelIfOpen(); // ✅ 추가
+      await db.saveTodayToDB();
+    });
+
+    el.historyBtn.addEventListener("click", () => {
+      closeAllMenus2();
+      closeAppShellPanelIfOpen(); // ✅ 추가
+      openHistory();
+    });
+
+    el.reloadBtn.addEventListener("click", async () => {
+      closeAllMenus2();
+      closeAppShellPanelIfOpen(); // ✅ 추가
+      await db.doReloadAction();
+    });
+
+    el.ocoBtn.addEventListener("click", () => {
+      closeAllMenus2();
+      closeAppShellPanelIfOpen(); // ✅ 추가
+      openOcoQuickCalc();
+    });
+
+    el.calcBtn.addEventListener("click", () => {
+      closeAllMenus2();
+      closeAppShellPanelIfOpen(); // ✅ 추가
+      openCalculator();
+    });
+
+    // ✅ Open AI Popup도 동일하게 닫기
+    const aiOpenBtn = document.getElementById("aiOpenBtn");
+    if (aiOpenBtn && aiOpenBtn.dataset.bound !== "1") {
+      aiOpenBtn.dataset.bound = "1";
+      aiOpenBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        closeAllMenus2();
+        closeAppShellPanelIfOpen(); // ✅ 추가
+        ai.openAiChatPopup("menu:aiOpenBtn");
+      });
+    }
+  }
+
+  // ✅ FIX 핵심: 바인딩 함수를 실제로 호출해야 메뉴가 동작함
   bindMenuActions();
 
   ai.ensureAiMenuInserted();
   ai.bindAiMenuActions();
 
   matrixTool.bindMatrixToolAction(() => getState().entries);
-  // ✅ Tool 메뉴 History 삽입 제거: 바인딩 호출도 제거
-  // historyTool.bindHistoryToolAction();
 
   // Matrix 안 들어가도 은행 이벤트 들어올 수 있으니, 여기서도 1회 바인딩
   db.bindBankDepositEventOnce();
@@ -557,6 +581,10 @@ import { createDbFlow } from "/src/app/dbFlow.js";
 
   initChat().catch(console.error);
 
+  // ✅ Neo client는 "API origin 확정 후" 시작하는게 안정적
+  //    (그리고 appendLog 인자도 반드시 el(domRefs)로)
+  let neo = null;
+
   (async () => {
     const origin = await detectApiOriginIfNeeded();
     if (!origin) {
@@ -564,8 +592,22 @@ import { createDbFlow } from "/src/app/dbFlow.js";
       setFileStatus(el, "DB: (미연결) • API/DB 상태 확인 필요 (DEFAULT 모드로 동작 중)");
       return;
     }
+
     appendLog(el, `[SYSTEM] API Origin = ${origin}`);
 
+    // ✅ 여기서 Neo SSE 시작
+    try {
+      neo = createNeoClient({
+        apiOrigin: origin, // neoClient가 이 옵션을 받지 않아도 무시될 뿐, 있으면 사용됨
+        appendLog: (s) => appendLog(el, s), // ✅ FIX: el.consoleLog 금지
+      });
+      neo.start();
+      // neoClient 내부에서 SSE_CONNECTED가 오면 반드시 찍혀야 정상
+    } catch (e) {
+      appendLog(el, "[SYSTEM] Neo 부팅 실패: " + (e?.message ?? e));
+    }
+
+    // ✅ DB 초기 로드
     db.reloadFromDB(true).catch((e) => {
       appendLog(el, "[SYSTEM] DB 초기 로드 실패: " + (e?.message ?? e));
       setFileStatus(el, "DB: (미연결) • API/DB 상태 확인 필요 (DEFAULT 모드로 동작 중)");

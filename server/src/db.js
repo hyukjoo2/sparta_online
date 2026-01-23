@@ -16,3 +16,13 @@ export const pool = mysql.createPool({
   namedPlaceholders: true,
   decimalNumbers: true,
 });
+
+export async function pingDb() {
+  const conn = await pool.getConnection();
+  try {
+    await conn.ping();
+    return true;
+  } finally {
+    conn.release();
+  }
+}

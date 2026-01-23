@@ -20,24 +20,30 @@ function buildChatLogContext(rows, maxChars = 12000) {
 }
 
 function elevateModalToFront(el) {
-  if (el.modalBackdrop) {
-    el.modalBackdrop.style.zIndex = "3000000";
-    el.modalBackdrop.style.position = "fixed";
-    el.modalBackdrop.style.inset = "0";
-  }
-  if (el.modalRoot) {
-    el.modalRoot.style.zIndex = "3000001";
-    el.modalRoot.style.maxWidth = "860px";
-    el.modalRoot.style.width = "min(860px, calc(100vw - 24px))";
-    el.modalRoot.style.maxHeight = "calc(100vh - 24px)";
-  }
-  if (el.modalClose) {
-    el.modalClose.style.zIndex = "3000002";
-  }
+  // el.* 이 없을 수 있으니 방어
+  try {
+    if (el?.modalBackdrop) {
+      el.modalBackdrop.style.zIndex = "3000000";
+      el.modalBackdrop.style.position = "fixed";
+      el.modalBackdrop.style.inset = "0";
+    }
+    if (el?.modalRoot) {
+      el.modalRoot.style.zIndex = "3000001";
+      el.modalRoot.style.maxWidth = "860px";
+      el.modalRoot.style.width = "min(860px, calc(100vw - 24px))";
+      el.modalRoot.style.maxHeight = "calc(100vh - 24px)";
+    }
+    if (el?.modalClose) {
+      el.modalClose.style.zIndex = "3000002";
+    }
+  } catch (_) {}
 }
 
 export function createAiPopup({ el, openModal, closeAllMenus2 }) {
   let aiDialog = { turns: [], busy: false };
+
+  // 내부 상태: menuUI 의존 없이 토글
+  let __panelOpen = false;
 
   function ensureAiMenuInserted() {
     const menubar = document.querySelector(".menubar");
@@ -52,14 +58,27 @@ export function createAiPopup({ el, openModal, closeAllMenus2 }) {
     aiMenu.className = "menu";
     aiMenu.setAttribute("data-menu", "ai");
     aiMenu.innerHTML = `
-      <button class="menu-btn" type="button" id="aiMenuBtn">Ai ▾</button>
-      <div class="menu-panel" role="menu">
+      <button class="menu-btn" type="button" id="aiMenuBtn">AI ▾</button>
+      <div class="menu-panel" role="menu" id="aiMenuPanel" style="display:none;">
         <button class="menu-item" type="button" id="aiChatBtn">AI 분석 (chat_log)</button>
       </div>
     `;
 
     if (toolsMenu.nextSibling) menubar.insertBefore(aiMenu, toolsMenu.nextSibling);
     else menubar.appendChild(aiMenu);
+  }
+
+  function toggleAiPanel(forceOpen = null) {
+    const panel = document.getElementById("aiMenuPanel");
+    if (!panel) return;
+
+    const next = typeof forceOpen === "boolean" ? forceOpen : !__panelOpen;
+    __panelOpen = next;
+    panel.style.display = next ? "block" : "none";
+  }
+
+  function closeAiPanel() {
+    toggleAiPanel(false);
   }
 
   function renderAiChatBody() {
@@ -236,35 +255,114 @@ export function createAiPopup({ el, openModal, closeAllMenus2 }) {
     return wrap;
   }
 
-  function openAiChatPopup() {
-    elevateModalToFront(el);
+  function openAiChatPopup(source = "unknown") {
+    try {
+      // 메뉴 닫기(있으면) + AI 메뉴 패널도 닫기
+      try {
+        closeAllMenus2?.();
+      } catch {}
+      closeAiPanel();
 
-    if (!aiDialog.turns.length) {
-      aiDialog.turns.push({
-        role: "ai",
-        text:
-          "chat_log 테이블 기반 분석 모드입니다.\n" +
-          "예) '최근 감정/시장 관련 얘기만 요약해줘', '반복 패턴 찾아줘', '이번 주 키워드 TOP 5' 등",
+      if (!aiDialog.turns.length) {
+        aiDialog.turns.push({
+          role: "ai",
+          text:
+            "chat_log 테이블 기반 분석 모드입니다.\n" +
+            "예) '최근 감정/시장 관련 얘기만 요약해줘', '반복 패턴 찾아줘', '이번 주 키워드 TOP 5' 등",
+        });
+      }
+
+      if (typeof openModal !== "function") {
+        console.error("[aiPopup] openModal is not a function");
+        alert("모달 UI(openModal) 연결이 없습니다. modal.js 초기화를 확인하세요.");
+        return;
+      }
+
+      // ✅ 모달을 먼저 연 뒤, 그 다음 프론트로 끌어올리기 (DOM 생성 타이밍 보장)
+      openModal("AI", "chat_log 분석", renderAiChatBody(), { top: true });
+
+      // 모달 DOM이 붙은 뒤에 z-index 적용 (2번)
+      requestAnimationFrame(() => {
+        elevateModalToFront(el);
+        requestAnimationFrame(() => elevateModalToFront(el));
       });
-    }
 
-    openModal("AI", "chat_log 분석", renderAiChatBody(), { top: true });
-    elevateModalToFront(el);
+      console.log(`[aiPopup] opened (${source})`);
+
+      document.getElementById("appShellPanel")?.setAttribute("aria-hidden", "true");
+    } catch (e) {
+      console.error("[aiPopup] open error:", e);
+      alert("AI 팝업 열기 실패: " + (e?.message ?? e));
+    }
   }
 
   function bindAiMenuActions() {
     ensureAiMenuInserted();
 
+    const aiMenuBtn = document.getElementById("aiMenuBtn");
     const aiChatBtn = document.getElementById("aiChatBtn");
-    if (!aiChatBtn) return;
 
-    if (aiChatBtn.dataset.bound === "1") return;
-    aiChatBtn.dataset.bound = "1";
+    // 1) AI 메뉴 버튼 토글(메뉴UI 없어도 동작)
+    if (aiMenuBtn && aiMenuBtn.dataset.bound !== "1") {
+      aiMenuBtn.dataset.bound = "1";
+      aiMenuBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        // 다른 메뉴 닫기 시도
+        try {
+          closeAllMenus2?.();
+        } catch {}
+        toggleAiPanel();
+      });
+    }
 
-    aiChatBtn.addEventListener("click", () => {
-      closeAllMenus2();
-      openAiChatPopup();
-    });
+    // 2) AI 분석 버튼 클릭
+    if (aiChatBtn && aiChatBtn.dataset.bound !== "1") {
+      aiChatBtn.dataset.bound = "1";
+      aiChatBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        openAiChatPopup("menu:aiChatBtn");
+      });
+    }
+
+    // 3) 바깥 클릭 시 패널 닫기(단, 패널 내부 클릭은 무시)
+    document.addEventListener(
+      "click",
+      (e) => {
+        const t = e.target;
+        const panel = document.getElementById("aiMenuPanel");
+        const btn = document.getElementById("aiMenuBtn");
+        if (!panel || !btn) return;
+
+        const insidePanel = t && panel.contains(t);
+        const isBtn = t && (t === btn || btn.contains(t));
+        if (insidePanel || isBtn) return;
+
+        closeAiPanel();
+      },
+      true
+    );
+
+    // 4) ✅ Ctrl+I 백업 단축키 (main.js 없어도 열림)
+    if (!window.__aiPopupHotkeyBound) {
+      window.__aiPopupHotkeyBound = true;
+      window.addEventListener(
+        "keydown",
+        (e) => {
+          if (!e.ctrlKey || !(e.key?.toLowerCase() === "i" || e.key === "ㅑ")) return;
+          e.preventDefault();
+          e.stopPropagation();
+          openAiChatPopup("hotkey:Ctrl+I(aiPopup)");
+        },
+        { capture: true }
+      );
+    }
+
+    // 5) 개발용 백도어 (콘솔에서 window.openAI()로 열기)
+    if (!window.openAI) {
+      window.openAI = () => openAiChatPopup("window.openAI()");
+    }
   }
 
   return { ensureAiMenuInserted, bindAiMenuActions, openAiChatPopup };

@@ -214,5 +214,3 @@ CREATE TABLE IF NOT EXISTS neo_log (
   KEY idx_life_no (life_no),
   KEY idx_created_at (created_at)
 ) ENGINE=InnoDB;
-
-

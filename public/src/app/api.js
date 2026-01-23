@@ -151,3 +151,87 @@ export async function apiSearchChatLog(q, limit = 200) {
     `/api/chat_log/search?q=${encodeURIComponent(qq)}&limit=${encodeURIComponent(String(limit))}`
   );
 }
+
+// public/src/app/api.js
+
+export function getApiOrigin() {
+  // 이미 형님 프로젝트에 origin 계산이 있으면 그걸 써도 됩니다.
+  // 없으면 아래처럼 고정:
+  return "http://localhost:6431";
+}
+
+export function connectNeoSSE({ origin, onMessage, onStatus }) {
+  const apiOrigin = origin || getApiOrigin();
+  const url = `${apiOrigin}/api/neo/stream`;
+
+  let es = null;
+  let closed = false;
+  let reconnectTimer = null;
+
+  const logStatus = (msg) => {
+    try {
+      onStatus?.(msg);
+    } catch (_) {}
+  };
+
+  const connect = () => {
+    if (closed) return;
+    if (es) {
+      try {
+        es.close();
+      } catch (_) {}
+      es = null;
+    }
+
+    logStatus(`[SYSTEM] SSE connecting... ${url}`);
+
+    es = new EventSource(url);
+
+    es.onopen = () => {
+      logStatus("[SYSTEM] SSE opened");
+    };
+
+    es.onmessage = (ev) => {
+      // 서버는 data: JSON 형태로 보냄
+      try {
+        const data = JSON.parse(ev.data);
+        onMessage?.(data);
+      } catch (e) {
+        // JSON 아닐 때도 찍어주기
+        onMessage?.({ type: "SYSTEM", message: String(ev.data) });
+      }
+    };
+
+    es.onerror = () => {
+      logStatus("[SYSTEM] SSE error (will reconnect)");
+      try {
+        es.close();
+      } catch (_) {}
+      es = null;
+
+      if (!closed && !reconnectTimer) {
+        reconnectTimer = setTimeout(() => {
+          reconnectTimer = null;
+          connect();
+        }, 1200);
+      }
+    };
+  };
+
+  connect();
+
+  return {
+    close() {
+      closed = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+      if (es) {
+        try {
+          es.close();
+        } catch (_) {}
+      }
+      es = null;
+      logStatus("[SYSTEM] SSE closed");
+    },
+  };
+}

@@ -119,8 +119,8 @@ export function createRenderUI({
 
   function setAdenaBadge() {
     const n = Number(getAdena());
-    const safe = Number.isFinite(n) ? Math.max(0, n) : 0;
-    el.pnlText.textContent = fmt2(safe);
+    const value = Number.isFinite(n) ? n : 0;   // ✅ 음수 유지
+    el.pnlText.textContent = fmt2(value);
   }
 
   function render() {

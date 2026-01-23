@@ -1,4 +1,3 @@
-// app.js
 // server/src/app.js
 import express from "express";
 import cors from "cors";
@@ -6,6 +5,10 @@ import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import { pool } from "./db.js";
+
+// ✅ NEO
+import { createNeoEngine } from "./neo/neoEngine.js";
+import { createNeoRouter } from "./neo/neoRouter.js";
 
 dotenv.config();
 
@@ -99,7 +102,6 @@ async function readPathListFromDB(tableName) {
 
 // ======================================================================
 // ✅ KST(Asia/Seoul) 기준 YYYY-MM-DD
-// - 서버 timezone / mysql2 date 파싱과 무관하게 “오늘”을 KST로 고정
 // ======================================================================
 function todayKstYYYYMMDD(date = new Date()) {
   return new Intl.DateTimeFormat("en-CA", {
@@ -109,8 +111,6 @@ function todayKstYYYYMMDD(date = new Date()) {
     day: "2-digit",
   }).format(date);
 }
-
-// 기존 todayTS()를 KST 버전으로 교체
 function todayTS() {
   return todayKstYYYYMMDD();
 }
@@ -197,7 +197,7 @@ async function readAdenaFromDB() {
         return { adena: Number(v), source: a.name };
       }
     } catch {
-      // 다음 시도로
+      // next attempt
     }
   }
 
@@ -245,9 +245,6 @@ async function applyAdenaDelta(delta) {
 
 // ======================================================================
 // ✅ HISTORY: TS를 “항상 YYYY-MM-DD 문자열”로 내려주기
-// - 이렇게 하면 프론트 차트가 UTC ISO 때문에 하루 밀리는 문제가 사라짐
-// - TS가 DATE면 그냥 문자열화됨
-// - TS가 DATETIME/TIMESTAMP여도 날짜만 잘라서 문자열로 내려감
 // ======================================================================
 const SELECT_HISTORY_SQL = `
   SELECT
@@ -275,7 +272,7 @@ async function upsertTodayHistory(amount) {
     throw new Error("history 테이블이 없습니다. (DB에 history 테이블 생성 필요)");
   }
 
-  const ts = todayTS(); // ✅ KST 기준 YYYY-MM-DD
+  const ts = todayTS();
   const amt = Number(amount);
   if (!Number.isFinite(amt)) throw new Error("amount must be a number");
 
@@ -294,7 +291,6 @@ async function upsertTodayHistory(amount) {
   const pnl =
     prev === null || !Number.isFinite(prev) || prev === 0 ? 0 : ((amt - prev) / prev) * 100;
 
-  // (형님 기존 방식 유지) 오늘은 1개만 유지
   await pool.query("DELETE FROM history WHERE TS = ?", [ts]);
   await pool.query("INSERT INTO history (TS, AMOUNT, PNL) VALUES (?, ?, ?)", [ts, amt, pnl]);
 
@@ -309,7 +305,6 @@ async function readBglistFromDB() {
   return await readPathListFromDB("bglist");
 }
 
-// ✅ id 파싱
 function toId(v) {
   const n = Number(v);
   if (!Number.isInteger(n) || n <= 0) return null;
@@ -345,7 +340,6 @@ app.post("/api/adena/delta", async (req, res, next) => {
   }
 });
 
-// ✅ /api/history  (TS: YYYY-MM-DD 문자열)
 app.get("/api/history", async (req, res, next) => {
   try {
     const rows = await readHistoryFromDB();
@@ -355,8 +349,6 @@ app.get("/api/history", async (req, res, next) => {
   }
 });
 
-// ✅ /api/history/today
-// 응답 포맷: { bonus, adena, history }
 app.post("/api/history/today", async (req, res, next) => {
   try {
     const amount = Number(req.body?.amount);
@@ -373,7 +365,7 @@ app.post("/api/history/today", async (req, res, next) => {
     res.json({
       bonus,
       adena: Number(adenaOut.adena || 0),
-      history, // ✅ TS 문자열로 내려감
+      history,
     });
   } catch (e) {
     next(e);
@@ -383,8 +375,6 @@ app.post("/api/history/today", async (req, res, next) => {
 // ======================================================================
 // ✅ COMMENTS API
 // ======================================================================
-
-// GET /api/history/:historyId/comments
 app.get("/api/history/:historyId/comments", async (req, res, next) => {
   try {
     const historyId = toId(req.params.historyId);
@@ -410,7 +400,6 @@ app.get("/api/history/:historyId/comments", async (req, res, next) => {
   }
 });
 
-// POST /api/history/:historyId/comments
 app.post("/api/history/:historyId/comments", async (req, res, next) => {
   try {
     const historyId = toId(req.params.historyId);
@@ -452,7 +441,6 @@ app.post("/api/history/:historyId/comments", async (req, res, next) => {
   }
 });
 
-// PUT /api/history/comments/:commentId
 app.put("/api/history/comments/:commentId", async (req, res, next) => {
   try {
     const commentId = toId(req.params.commentId);
@@ -493,7 +481,6 @@ app.put("/api/history/comments/:commentId", async (req, res, next) => {
   }
 });
 
-// DELETE /api/history/comments/:commentId
 app.delete("/api/history/comments/:commentId", async (req, res, next) => {
   try {
     const commentId = toId(req.params.commentId);
@@ -520,7 +507,6 @@ app.delete("/api/history/comments/:commentId", async (req, res, next) => {
 // ======================================================================
 // ✅ CHAT LOG API
 // ======================================================================
-
 app.post("/api/chat_log", async (req, res, next) => {
   try {
     const msg = String(req.body?.message ?? "").trim();
@@ -575,7 +561,7 @@ app.get("/api/bglist", async (req, res, next) => {
   }
 });
 
-// ✅ /api/all  (history.TS가 YYYY-MM-DD 문자열로 내려감)
+// ✅ /api/all
 app.get("/api/all", async (req, res, next) => {
   try {
     const [adenaOut, history, bgmusic, bglist] = await Promise.all([
@@ -587,7 +573,7 @@ app.get("/api/all", async (req, res, next) => {
 
     res.json({
       adena: adenaOut.adena,
-      history, // ✅ 여기서 이제 ISO(Z) 안 나옴
+      history,
       bgmusic,
       bglist,
       meta: {
@@ -599,6 +585,23 @@ app.get("/api/all", async (req, res, next) => {
     next(e);
   }
 });
+
+// ======================================================================
+// ✅ NEO (Router + Engine)
+// - /api/neo/health
+// - /api/neo/state
+// - /api/neo/log?limit=50
+// - /api/neo/stream (SSE)
+// ======================================================================
+
+// ✅ 엔진은 여기서 "단 한 번" 생성
+const neoEngine = createNeoEngine({
+  tickMs: Number(5000),
+  checkpointEveryMin: Number(process.env.NEO_CHECKPOINT_MIN || 1),
+});
+
+// ✅ 라우터 마운트 (⚠️ fallback 위에!)
+app.use("/api/neo", createNeoRouter({ engine: neoEngine }));
 
 // =========================
 // Error handler (JSON으로 반환)
@@ -613,8 +616,12 @@ app.use((err, req, res, next) => {
 
 // =========================
 // SPA fallback (⚠️ 반드시 맨 마지막)
+// - ✅ /api/* 는 절대 index.html로 보내면 안 됨
 // =========================
 app.use((req, res) => {
+  if (req.path.startsWith("/api/")) {
+    return res.status(404).json({ ok: false, error: "API route not found", path: req.path });
+  }
   res.sendFile(path.join(publicDir, "index.html"));
 });
 
@@ -631,5 +638,13 @@ app.listen(PORT, async () => {
     console.log("✅ MySQL connected");
   } catch (e) {
     console.error("❌ MySQL connection failed:", e?.message || e);
+  }
+
+  // ✅ Neo Engine start (핵심!)
+  try {
+    await neoEngine.start();
+    console.log("✅ Neo engine started");
+  } catch (e) {
+    console.error("❌ Neo engine start failed:", e?.message || e);
   }
 });

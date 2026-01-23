@@ -71,6 +71,8 @@ export function createDbFlow({
   }
 
   function maybeShowProfitFx(baseAmount, todayAmount) {
+    if (baseAmount == null) return; // ✅ 핵심: null/undefined면 비교 자체를 안 함
+
     const prev = Number(baseAmount);
     const curr = Number(todayAmount);
     if (!Number.isFinite(prev) || !Number.isFinite(curr)) return;
@@ -216,9 +218,12 @@ export function createDbFlow({
   }
 
   function calcProfitBonusFromBase(baseAmt, savedAmount) {
+    if (baseAmt == null) return { profit: 0, bonus: 0, prev: null }; // ✅ 추가
+
     const prev = Number(baseAmt);
     const curr = Number(savedAmount);
-    if (!Number.isFinite(curr) || !Number.isFinite(prev)) return { profit: 0, bonus: 0, prev };
+    if (!Number.isFinite(curr) || !Number.isFinite(prev)) return { profit: 0, bonus: 0, prev: null };
+
     const profit = Math.max(0, curr - prev);
     const bonus = round2(profit * 0.1);
     return { profit, bonus, prev };

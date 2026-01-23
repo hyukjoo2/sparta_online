@@ -30,8 +30,8 @@ export const DEFAULT_BGMUSIC = [
 export const CHATLOG_INTERVAL_MS = 10000;
 export const BG_INTERVAL_MS = 20000;
 
-export const MAX_LEVEL = 50;
-export const MAX_CURRENT_INDICATOR = 50000;
+export const MAX_LEVEL = 35;
+export const MAX_CURRENT_INDICATOR = MAX_LEVEL * 1000;
 
 // Local LLM
 export const LLM_ENDPOINT = "http://127.0.0.1:8000/chat";
