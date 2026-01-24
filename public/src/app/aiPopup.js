@@ -3,7 +3,7 @@ import { LLM_ENDPOINT } from "/src/app/constants.js";
 import { showBusyIndicator, hideBusyIndicator } from "/src/app/busyIndicator.js";
 import { apiGetChatLogRecent, apiSearchChatLog } from "/src/app/api.js";
 
-function buildChatLogContext(rows, maxChars = 12000) {
+function buildChatLogContext(rows, maxChars = 3600) {
   const list = (Array.isArray(rows) ? rows : [])
     .map((r) => {
       const id = r?.id != null ? `#${r.id}` : "#?";
