@@ -43,15 +43,12 @@ import { detectApiOriginIfNeeded } from "/src/app/api.js";
 import { createChatRotation } from "/src/app/chatRotation.js";
 import { createLlmChat } from "/src/app/llmChat.js";
 import { createAiPopup } from "/src/app/aiPopup.js";
-// ✅ Tool 메뉴의 History 항목 제거를 위해 HistoryTool 사용 안 함
-// import { createHistoryTool } from "/src/app/historyTool.js";
 import { createMatrixTool } from "/src/app/matrixTool.js";
 import { createDbFlow } from "/src/app/dbFlow.js";
 
 (() => {
   const el = getDomRefs(document);
 
-  // ===== state (한 곳에서만) =====
   let state = {
     bgList: DEFAULT_BG_LIST.slice(),
     bgmusic: DEFAULT_BGMUSIC.slice(),
@@ -65,12 +62,10 @@ import { createDbFlow } from "/src/app/dbFlow.js";
     chatOverride: null,
     orbsOverride: null,
 
-    // background state
     bgTimer: null,
     bgIndex: 0,
     bgFront: "A",
 
-    // audio state
     trackIndex: 0,
     isPlaying: false,
   };
@@ -83,13 +78,13 @@ import { createDbFlow } from "/src/app/dbFlow.js";
   }
 
   // ==========================================================
-  // ✅ Ctrl+T : 채팅창(로그 영역) 높이 "5배 ↔ 원복" 토글
+  // ✅ Ctrl+T : 채팅창 높이 토글
   // ==========================================================
   let __chatHotkeyBound = false;
   let __chatToggled = false;
 
-  let __chatBaseHeightPx = null; // 원래 높이(px)
-  let __chatStyleBackup = null; // 원래 inline style 백업
+  let __chatBaseHeightPx = null;
+  let __chatStyleBackup = null;
 
   function _pickChatTargetEl() {
     if (el?.consoleLog) return el.consoleLog;
@@ -127,7 +122,7 @@ import { createDbFlow } from "/src/app/dbFlow.js";
     return __chatBaseHeightPx;
   }
 
-  function _applyChatHeight(pxOrNull) {
+  function _applyChatHeight(pxOrNull, syncQuotaTickerPosition) {
     const target = _pickChatTargetEl();
     if (!target) return;
 
@@ -146,11 +141,11 @@ import { createDbFlow } from "/src/app/dbFlow.js";
     }
 
     try {
-      syncQuotaTickerPosition();
+      syncQuotaTickerPosition?.();
     } catch (_) {}
   }
 
-  function toggleChatDoubleHeight() {
+  function toggleChatDoubleHeight(syncQuotaTickerPosition) {
     const target = _pickChatTargetEl();
     if (!target) return;
 
@@ -158,10 +153,10 @@ import { createDbFlow } from "/src/app/dbFlow.js";
 
     if (!__chatToggled) {
       __chatToggled = true;
-      _applyChatHeight(base * 5);
+      _applyChatHeight(base * 5, syncQuotaTickerPosition);
     } else {
       __chatToggled = false;
-      _applyChatHeight(null);
+      _applyChatHeight(null, syncQuotaTickerPosition);
     }
 
     try {
@@ -171,7 +166,7 @@ import { createDbFlow } from "/src/app/dbFlow.js";
     } catch (_) {}
   }
 
-  function bindChatHeightHotkeyOnce() {
+  function bindChatHeightHotkeyOnce(syncQuotaTickerPosition) {
     if (__chatHotkeyBound) return;
     __chatHotkeyBound = true;
 
@@ -183,7 +178,7 @@ import { createDbFlow } from "/src/app/dbFlow.js";
         e.preventDefault();
         e.stopPropagation();
 
-        toggleChatDoubleHeight();
+        toggleChatDoubleHeight(syncQuotaTickerPosition);
       },
       { capture: true }
     );
@@ -359,8 +354,28 @@ import { createDbFlow } from "/src/app/dbFlow.js";
     })();
   }
 
-  // ===== AI Popup =====
-  const ai = createAiPopup({ el, openModal, closeAllMenus2 });
+  // ===== AI Popup (✅ function calling UI actions injected) =====
+  const ai = createAiPopup({
+    el,
+    openModal,
+    closeAllMenus2,
+
+    onOpenHistory: () => {
+      closeAllMenus2();
+      document.getElementById("appShellPanel")?.setAttribute("aria-hidden", "true");
+      openHistory();
+    },
+    onOpenOcoCalc: () => {
+      closeAllMenus2();
+      document.getElementById("appShellPanel")?.setAttribute("aria-hidden", "true");
+      openOcoQuickCalc();
+    },
+    onOpenCalculator: () => {
+      closeAllMenus2();
+      document.getElementById("appShellPanel")?.setAttribute("aria-hidden", "true");
+      openCalculator();
+    },
+  });
 
   // ===== Commands =====
   const commands = createCommandsFeature({
@@ -479,45 +494,43 @@ import { createDbFlow } from "/src/app/dbFlow.js";
     panel.setAttribute("aria-hidden", "true");
   }
 
-  // ===== Boot =====
   function bindMenuActions() {
     el.openBtn.addEventListener("click", async () => {
       closeAllMenus2();
-      closeAppShellPanelIfOpen(); // ✅ 추가
+      closeAppShellPanelIfOpen();
       await db.reloadFromDB(true);
     });
 
     el.saveOpenedBtn.addEventListener("click", async () => {
       closeAllMenus2();
-      closeAppShellPanelIfOpen(); // ✅ 추가
+      closeAppShellPanelIfOpen();
       await db.saveTodayToDB();
     });
 
     el.historyBtn.addEventListener("click", () => {
       closeAllMenus2();
-      closeAppShellPanelIfOpen(); // ✅ 추가
+      closeAppShellPanelIfOpen();
       openHistory();
     });
 
     el.reloadBtn.addEventListener("click", async () => {
       closeAllMenus2();
-      closeAppShellPanelIfOpen(); // ✅ 추가
+      closeAppShellPanelIfOpen();
       await db.doReloadAction();
     });
 
     el.ocoBtn.addEventListener("click", () => {
       closeAllMenus2();
-      closeAppShellPanelIfOpen(); // ✅ 추가
+      closeAppShellPanelIfOpen();
       openOcoQuickCalc();
     });
 
     el.calcBtn.addEventListener("click", () => {
       closeAllMenus2();
-      closeAppShellPanelIfOpen(); // ✅ 추가
+      closeAppShellPanelIfOpen();
       openCalculator();
     });
 
-    // ✅ Open AI Popup도 동일하게 닫기
     const aiOpenBtn = document.getElementById("aiOpenBtn");
     if (aiOpenBtn && aiOpenBtn.dataset.bound !== "1") {
       aiOpenBtn.dataset.bound = "1";
@@ -525,13 +538,13 @@ import { createDbFlow } from "/src/app/dbFlow.js";
         e.preventDefault();
         e.stopPropagation();
         closeAllMenus2();
-        closeAppShellPanelIfOpen(); // ✅ 추가
+        closeAppShellPanelIfOpen();
         ai.openAiChatPopup("menu:aiOpenBtn");
       });
     }
   }
 
-  // ✅ FIX 핵심: 바인딩 함수를 실제로 호출해야 메뉴가 동작함
+  // ✅ 핵심: 바인딩 호출
   bindMenuActions();
 
   ai.ensureAiMenuInserted();
@@ -539,12 +552,11 @@ import { createDbFlow } from "/src/app/dbFlow.js";
 
   matrixTool.bindMatrixToolAction(() => getState().entries);
 
-  // Matrix 안 들어가도 은행 이벤트 들어올 수 있으니, 여기서도 1회 바인딩
   db.bindBankDepositEventOnce();
 
   ensureBusyIndicator();
 
-  bindChatHeightHotkeyOnce();
+  bindChatHeightHotkeyOnce(syncQuotaTickerPosition);
 
   audio.initAudio();
   background.bindToggleButtonOnce();
@@ -581,8 +593,6 @@ import { createDbFlow } from "/src/app/dbFlow.js";
 
   initChat().catch(console.error);
 
-  // ✅ Neo client는 "API origin 확정 후" 시작하는게 안정적
-  //    (그리고 appendLog 인자도 반드시 el(domRefs)로)
   let neo = null;
 
   (async () => {
@@ -595,19 +605,16 @@ import { createDbFlow } from "/src/app/dbFlow.js";
 
     appendLog(el, `[SYSTEM] API Origin = ${origin}`);
 
-    // ✅ 여기서 Neo SSE 시작
     try {
       neo = createNeoClient({
-        apiOrigin: origin, // neoClient가 이 옵션을 받지 않아도 무시될 뿐, 있으면 사용됨
-        appendLog: (s) => appendLog(el, s), // ✅ FIX: el.consoleLog 금지
+        apiOrigin: origin,
+        appendLog: (s) => appendLog(el, s),
       });
       neo.start();
-      // neoClient 내부에서 SSE_CONNECTED가 오면 반드시 찍혀야 정상
     } catch (e) {
       appendLog(el, "[SYSTEM] Neo 부팅 실패: " + (e?.message ?? e));
     }
 
-    // ✅ DB 초기 로드
     db.reloadFromDB(true).catch((e) => {
       appendLog(el, "[SYSTEM] DB 초기 로드 실패: " + (e?.message ?? e));
       setFileStatus(el, "DB: (미연결) • API/DB 상태 확인 필요 (DEFAULT 모드로 동작 중)");

@@ -1,3 +1,4 @@
+# app.py
 from typing import List, Literal, Optional, Tuple
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,8 +16,12 @@ from sentence_transformers import SentenceTransformer
 OLLAMA_URL = "http://localhost:11434/api/chat"
 MODEL = "exaone3.5"
 
-# ✅ 서버에서 항상 강제되는 시스템 프롬프트
-SYSTEM_PROMPT = "You are a player of a MMORPG. Give your answer shortly in Korean."
+# ✅ 서버 기본 시스템 프롬프트 (요청에서 system_prompt 오면 그걸 우선 사용)
+SYSTEM_PROMPT = (
+    "너는 한국어로 짧고 정확하게 답하는 AI 비서다.\n"
+    "필요하면 아래 중 하나의 JSON만 단독으로 출력할 수 있다(설명/문장/코드펜스 금지).\n"
+    '{"tool":"OPEN_HISTORY_MODAL"} | {"tool":"OPEN_OCO_CALC"} | {"tool":"OPEN_CALCULATOR"}\n'
+)
 
 # =========================
 # Chat limits
@@ -57,22 +62,29 @@ app.add_middleware(
 
 Role = Literal["system", "user", "assistant"]
 
+
 class ChatMessage(BaseModel):
     role: Role
     content: str = Field(default="", max_length=4000)
 
+
 class ChatReq(BaseModel):
+    # ✅ aiPopup에서 system_prompt를 내려보낼 수 있게 지원
+    system_prompt: Optional[str] = Field(default=None, max_length=4000)
     messages: List[ChatMessage]
+
 
 # =========================
 # Globals
 # =========================
 _embedding_model: Optional[SentenceTransformer] = None
 
+
 @app.on_event("startup")
 def startup():
     global _embedding_model
     _embedding_model = SentenceTransformer(EMB_MODEL)
+
 
 def _get_db_conn():
     return mysql.connector.connect(
@@ -82,23 +94,26 @@ def _get_db_conn():
         database=MYSQL_DB,
     )
 
+
 # =========================
 # Helpers
 # =========================
-def normalize_messages(msgs: List[ChatMessage]) -> List[dict]:
+def normalize_messages(msgs: List[ChatMessage], base_system_prompt: str) -> List[dict]:
     non_system = [m for m in msgs if m.role != "system"]
     if len(non_system) > (MAX_TURNS * 2):
         non_system = non_system[-(MAX_TURNS * 2):]
 
-    out = [{"role": "system", "content": SYSTEM_PROMPT}]
+    out = [{"role": "system", "content": base_system_prompt}]
     out += [{"role": m.role, "content": m.content} for m in non_system]
     return out
+
 
 def _last_user_message(msgs: List[dict]) -> str:
     for m in reversed(msgs):
         if m["role"] == "user" and m.get("content", "").strip():
             return m["content"].strip()
     return ""
+
 
 # =========================
 # RAG Retrieval (Keyword → Semantic)
@@ -114,7 +129,8 @@ def _retrieve_rag_context(question: str) -> Tuple[str, List[dict]]:
     # ---- 1) KEYWORD SEARCH (FULLTEXT / LIKE) ----
     keyword_rows = []
     try:
-        cur.execute("""
+        cur.execute(
+            """
             SELECT
               d.source_type,
               d.source_id,
@@ -125,14 +141,17 @@ def _retrieve_rag_context(question: str) -> Tuple[str, List[dict]]:
             JOIN rag_doc d ON d.id = c.doc_id
             WHERE MATCH(c.content) AGAINST (%s IN BOOLEAN MODE)
             LIMIT %s
-        """, (question, RAG_TOP_K))
+        """,
+            (question, RAG_TOP_K),
+        )
         keyword_rows = cur.fetchall()
     except Exception:
         keyword_rows = []
 
     if not keyword_rows:
         like_q = f"%{question}%"
-        cur.execute("""
+        cur.execute(
+            """
             SELECT
               d.source_type,
               d.source_id,
@@ -143,7 +162,9 @@ def _retrieve_rag_context(question: str) -> Tuple[str, List[dict]]:
             JOIN rag_doc d ON d.id = c.doc_id
             WHERE c.content LIKE %s
             LIMIT %s
-        """, (like_q, RAG_TOP_K))
+        """,
+            (like_q, RAG_TOP_K),
+        )
         keyword_rows = cur.fetchall()
 
     if keyword_rows:
@@ -156,13 +177,15 @@ def _retrieve_rag_context(question: str) -> Tuple[str, List[dict]]:
                 break
             lines.append(line)
             size += len(line)
-            hits.append({
-                "mode": "keyword",
-                "score": score,
-                "source_type": st,
-                "source_id": int(sid),
-                "chunk_id": int(cid)
-            })
+            hits.append(
+                {
+                    "mode": "keyword",
+                    "score": score,
+                    "source_type": st,
+                    "source_id": int(sid),
+                    "chunk_id": int(cid),
+                }
+            )
         cur.close()
         conn.close()
         return "\n".join(lines), hits
@@ -171,7 +194,8 @@ def _retrieve_rag_context(question: str) -> Tuple[str, List[dict]]:
     q = _embedding_model.encode(question, normalize_embeddings=True)
     q = np.array(q, dtype=np.float32)
 
-    cur.execute("""
+    cur.execute(
+        """
         SELECT
           d.source_type,
           d.source_id,
@@ -180,7 +204,8 @@ def _retrieve_rag_context(question: str) -> Tuple[str, List[dict]]:
           c.embedding_json
         FROM rag_chunk c
         JOIN rag_doc d ON d.id = c.doc_id
-    """)
+    """
+    )
     rows = cur.fetchall()
     cur.close()
     conn.close()
@@ -206,15 +231,18 @@ def _retrieve_rag_context(question: str) -> Tuple[str, List[dict]]:
             break
         lines.append(line)
         size += len(line)
-        hits.append({
-            "mode": "semantic",
-            "score": round(score, 4),
-            "source_type": st,
-            "source_id": int(sid),
-            "chunk_id": int(cid)
-        })
+        hits.append(
+            {
+                "mode": "semantic",
+                "score": round(score, 4),
+                "source_type": st,
+                "source_id": int(sid),
+                "chunk_id": int(cid),
+            }
+        )
 
     return "\n".join(lines), hits
+
 
 def _inject_rag_system_message(msgs: List[dict], context: str) -> List[dict]:
     if not context:
@@ -226,9 +254,10 @@ def _inject_rag_system_message(msgs: List[dict], context: str) -> List[dict]:
             "아래 [근거]에 있는 내용만 사용해서 답변하세요. "
             "근거에 없으면 '근거 부족'이라고 말하세요.\n\n"
             f"[근거]\n{context}"
-        )
+        ),
     }
     return [msgs[0], rag_sys] + msgs[1:]
+
 
 # =========================
 # Routes
@@ -248,12 +277,18 @@ async def health():
         "model": MODEL,
         "rag_enabled": RAG_ENABLED,
         "mysql_db": MYSQL_DB,
-        "embedding_model": EMB_MODEL
+        "embedding_model": EMB_MODEL,
     }
+
 
 @app.post("/chat")
 async def chat(req: ChatReq):
-    msgs = normalize_messages(req.messages or [])
+    # ✅ 요청 system_prompt가 있으면 우선 사용
+    base_prompt = SYSTEM_PROMPT
+    if isinstance(req.system_prompt, str) and req.system_prompt.strip():
+        base_prompt = req.system_prompt.strip()
+
+    msgs = normalize_messages(req.messages or [], base_prompt)
 
     if not any(m["role"] == "user" for m in msgs):
         raise HTTPException(status_code=400, detail="No user message.")
@@ -270,10 +305,7 @@ async def chat(req: ChatReq):
         "model": MODEL,
         "messages": msgs,
         "stream": False,
-        "options": {
-            "temperature": 0.3,
-            "top_p": 0.9
-        }
+        "options": {"temperature": 0.3, "top_p": 0.9},
     }
 
     try:
@@ -288,10 +320,7 @@ async def chat(req: ChatReq):
 
             return {
                 "content": content,
-                "rag": {
-                    "used": bool(context),
-                    "hits": hits
-                }
+                "rag": {"used": bool(context), "hits": hits},
             }
 
     except httpx.RequestError as e:
